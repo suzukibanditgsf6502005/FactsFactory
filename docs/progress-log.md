@@ -5,6 +5,49 @@
 
 ---
 
+## 2026-04-03 — Text spine implemented: topic → research → script → storyboard
+
+**What was done:**
+- Implemented `scripts/research/topic_selector.py` (v1)
+  - Model: claude-haiku-4-5-20251001
+  - Generates 5 scored candidates, returns top pick
+  - Output: logs/topics/TIMESTAMP_category.json
+- Implemented `scripts/research/fact_research.py` (v1)
+  - Model: claude-sonnet-4-6
+  - 8–10 facts ordered by impact, strict JSON with validation
+  - Output: logs/research/TIMESTAMP_slug.json
+- Implemented `scripts/production/script_generator.py` (v1)
+  - Model: claude-sonnet-4-6
+  - hook + narration + CTA + 4 title_variants + emotional_angle
+  - Word count recomputed from actual full_script for accuracy
+  - Output: logs/scripts/TIMESTAMP_slug.json
+- Implemented `scripts/production/storyboard_generator.py` (v1)
+  - Model: claude-haiku-4-5-20251001
+  - 7–9 scenes: scene_goal, narration_segment, visual_description, image_prompt, motion
+  - Scene durations validated + auto-corrected
+  - Output: logs/storyboards/TIMESTAMP_slug.json
+- Created `scripts/run_spine.py` — orchestrator for the full chain
+  - --dry-run: no files written, all output to stdout
+  - --topic-file / --research-file / --script-file: resume from any stage
+  - --target-duration: controls script length
+- Created venv at FactsFactory/venv, installed anthropic + python-dotenv
+- All CLIs verified with --help
+- Updated docs: current-task, resume-handoff, progress-log
+
+**Files changed:**
+- scripts/research/topic_selector.py (scaffold → v1)
+- scripts/research/fact_research.py (scaffold → v1)
+- scripts/production/script_generator.py (scaffold → v1)
+- scripts/production/storyboard_generator.py (scaffold → v1)
+- scripts/run_spine.py (new)
+- docs/current-task.md, docs/resume-handoff.md, docs/progress-log.md
+
+**Blocker:** .env not copied to FactsFactory — live API test not yet run.
+
+**Next step:** Copy .env, run `python scripts/run_spine.py --category animal_facts --dry-run`
+
+---
+
 ## 2026-04-03 — Bootstrap: FactsFactory created from PawFactory
 
 **What was done:**

@@ -1,0 +1,658 @@
+{
+  "version": 1,
+  "description": "PawFactory music library catalog. Each category targets 10+ tracks. Add tracks as MP3 files in assets/music/{category}/ and list them here.",
+  "categories": {
+    "dramatic": {
+      "description": "Tense, building tension \u2014 suits the danger phase before rescue begins",
+      "use_when": "Story opens with threat, animal in immediate danger, escalating stakes",
+      "target_count": 10,
+      "tracks": [
+        {
+          "file": "dramatic_01.mp3",
+          "energy": "high",
+          "mood": [
+            "tense",
+            "building",
+            "urgent"
+          ],
+          "duration_s": 144,
+          "source": "original library",
+          "notes": "Five Armies style \u2014 orchestral build"
+        }
+      ]
+    },
+    "uplifting": {
+      "description": "Warm, hopeful, triumphant \u2014 suits successful rescues and happy resolutions",
+      "use_when": "Rescue succeeds, animal is safe, reunited, healed, or thriving",
+      "target_count": 10,
+      "tracks": [
+        {
+          "file": "uplifting_01.mp3",
+          "energy": "medium",
+          "mood": [
+            "hopeful",
+            "warm",
+            "triumphant"
+          ],
+          "duration_s": 286,
+          "source": "original library",
+          "notes": "Inspired style \u2014 warm orchestral"
+        }
+      ]
+    },
+    "ambient": {
+      "description": "Calm, atmospheric, observational \u2014 suits quiet nature or recovery scenes",
+      "use_when": "Calm footage, gradual transformation, animal in recovery, peaceful nature",
+      "target_count": 10,
+      "tracks": [
+        {
+          "file": "ambient_01.mp3",
+          "energy": "low",
+          "mood": [
+            "calm",
+            "atmospheric",
+            "peaceful"
+          ],
+          "duration_s": 217,
+          "source": "original library",
+          "notes": "Invariance style \u2014 atmospheric pads"
+        }
+      ]
+    },
+    "tense": {
+      "description": "High-stakes immediate danger \u2014 suits crisis moments, time-pressure rescues",
+      "use_when": "Animal has seconds to live, countdown situations, peak danger moments",
+      "target_count": 10,
+      "tracks": []
+    },
+    "hopeful": {
+      "description": "Gentle optimism mid-rescue \u2014 suits the turning point before full resolution",
+      "use_when": "Rescue is underway but outcome uncertain, early signs of hope",
+      "target_count": 10,
+      "tracks": []
+    },
+    "epic": {
+      "description": "Grand scale, cinematic \u2014 suits large wildlife, wilderness, mass rescues",
+      "use_when": "Elephants, whales, large-scale disasters, multiple animals rescued",
+      "target_count": 10,
+      "tracks": []
+    },
+    "sad_resolve": {
+      "description": "Bittersweet resolution \u2014 suits stories with partial recovery or tough journey",
+      "use_when": "Long rehabilitation, animal lost companions, hard-fought survival",
+      "target_count": 10,
+      "tracks": []
+    }
+  },
+  "tracks": {
+    "dramatic": [
+      {
+        "file": "dramatic_02.mp3",
+        "epidemic_id": "0d0290f6-aec0-3789-b306-66d7935a19bd",
+        "title": "Agents and Targets",
+        "bpm": 106,
+        "energy": "high",
+        "mood": [
+          "action",
+          "chase",
+          "heavy-ponderous",
+          "no-vocals",
+          "suspense"
+        ],
+        "duration_s": 102.9,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Agents and Targets"
+      },
+      {
+        "file": "dramatic_03.mp3",
+        "epidemic_id": "8043fc7f-249e-34f9-a953-a89c206ea5fc",
+        "title": "Why We Fought",
+        "bpm": 119,
+        "energy": "high",
+        "mood": [
+          "adventure",
+          "dark",
+          "mystery",
+          "sad",
+          "vocal-presence"
+        ],
+        "duration_s": 121.7,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Why We Fought"
+      },
+      {
+        "file": "dramatic_04.mp3",
+        "epidemic_id": "a10eb269-ba7c-4331-ab3a-ec143596d4c8",
+        "title": "Entering the Atmosphere",
+        "bpm": 87,
+        "energy": "high",
+        "mood": [
+          "action",
+          "dark",
+          "heavy-ponderous",
+          "no-vocals",
+          "orchestral"
+        ],
+        "duration_s": 171.9,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Entering the Atmosphere"
+      },
+      {
+        "file": "dramatic_05.mp3",
+        "epidemic_id": "4d830db9-22dc-4512-982c-f33c5f56d3b2",
+        "title": "Zion",
+        "bpm": 82,
+        "energy": "high",
+        "mood": [
+          "contemporary-classical",
+          "epic",
+          "orchestral",
+          "suspense",
+          "vocal-presence"
+        ],
+        "duration_s": 221.0,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Zion"
+      },
+      {
+        "file": "dramatic_06.mp3",
+        "epidemic_id": "f560b512-130c-381e-9152-6c4165836f11",
+        "title": "Slammed Shut",
+        "bpm": 107,
+        "energy": "high",
+        "mood": [
+          "ambient",
+          "dark",
+          "drone",
+          "no-vocals",
+          "suspense"
+        ],
+        "duration_s": 118.9,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Slammed Shut"
+      },
+      {
+        "file": "dramatic_07.mp3",
+        "epidemic_id": "c51e2740-a055-38ec-a211-ad4940ce871e",
+        "title": "At Arm's Length",
+        "bpm": 149,
+        "energy": "high",
+        "mood": [
+          "action",
+          "angry",
+          "build",
+          "chasing",
+          "suspense"
+        ],
+        "duration_s": 119.9,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: At Arm's Length"
+      },
+      {
+        "file": "dramatic_08.mp3",
+        "epidemic_id": "f831f4eb-8ce1-36d8-8383-6d73e68d0a89",
+        "title": "Lost in Krubera",
+        "bpm": 90,
+        "energy": "high",
+        "mood": [
+          "action",
+          "build",
+          "dark",
+          "no-vocals",
+          "suspense"
+        ],
+        "duration_s": 107.8,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Lost in Krubera"
+      }
+    ],
+    "uplifting": [
+      {
+        "file": "uplifting_02.mp3",
+        "epidemic_id": "d92caebc-4f60-30c7-a0fd-bbbd2b74404a",
+        "title": "A New Horizon",
+        "bpm": 76,
+        "energy": "medium",
+        "mood": [
+          "action",
+          "build",
+          "epic",
+          "hopeful",
+          "no-vocals"
+        ],
+        "duration_s": 144.0,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: A New Horizon"
+      },
+      {
+        "file": "uplifting_03.mp3",
+        "epidemic_id": "b11419b3-27e5-3134-a17e-c0521c64ba77",
+        "title": "Once Upon a Lifetime",
+        "bpm": 130,
+        "energy": "medium",
+        "mood": [
+          "beautiful",
+          "drama",
+          "glamorous",
+          "happy",
+          "no-vocals"
+        ],
+        "duration_s": 130.0,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Once Upon a Lifetime"
+      },
+      {
+        "file": "uplifting_04.mp3",
+        "epidemic_id": "25fbd2ab-23e1-3b93-be89-0d9207f7aeec",
+        "title": "Three Keys of Hope",
+        "bpm": 120,
+        "energy": "medium",
+        "mood": [
+          "ambient",
+          "dreamy",
+          "hopeful",
+          "no-vocals"
+        ],
+        "duration_s": 209.0,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Three Keys of Hope"
+      },
+      {
+        "file": "uplifting_05.mp3",
+        "epidemic_id": "52cbde62-0c4d-499d-94ba-1ca61801a22f",
+        "title": "Safe In His Arms",
+        "bpm": 86,
+        "energy": "medium",
+        "mood": [
+          "contemporary-christian",
+          "hopeful",
+          "no-vocals",
+          "sentimental"
+        ],
+        "duration_s": 272.3,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Safe In His Arms"
+      },
+      {
+        "file": "uplifting_06.mp3",
+        "epidemic_id": "78195f62-15fc-4312-9d29-1bd8f8af1402",
+        "title": "Amazing",
+        "bpm": 90,
+        "energy": "medium",
+        "mood": [
+          "clean",
+          "contemporary-gospel",
+          "dreamy",
+          "hopeful",
+          "lead-vocals"
+        ],
+        "duration_s": 229.5,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Amazing"
+      }
+    ],
+    "ambient": [
+      {
+        "file": "ambient_02.mp3",
+        "epidemic_id": "3e9e60ba-c63d-3184-b797-93b8f96ce9fc",
+        "title": "Escaping Routines",
+        "bpm": 20,
+        "energy": "low",
+        "mood": [
+          "drama",
+          "dreamy",
+          "hopeful",
+          "no-vocals",
+          "peaceful"
+        ],
+        "duration_s": 162.0,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Escaping Routines"
+      },
+      {
+        "file": "ambient_03.mp3",
+        "epidemic_id": "64a301fb-eb0f-3a70-bd44-87014186b6bb",
+        "title": "Sand Dust",
+        "bpm": 60,
+        "energy": "low",
+        "mood": [
+          "drama",
+          "dreamy",
+          "no-vocals",
+          "peaceful",
+          "solo-piano"
+        ],
+        "duration_s": 115.5,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Sand Dust"
+      },
+      {
+        "file": "ambient_04.mp3",
+        "epidemic_id": "61f5e444-276c-3c04-aa2d-e06bfc1335b9",
+        "title": "Sympathy's Whisper",
+        "bpm": 60,
+        "energy": "low",
+        "mood": [
+          "drama",
+          "dreamy",
+          "no-vocals",
+          "peaceful",
+          "solo-piano"
+        ],
+        "duration_s": 141.7,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Sympathy's Whisper"
+      },
+      {
+        "file": "ambient_05.mp3",
+        "epidemic_id": "28484363-7ccc-3c78-a1aa-00fc63295edd",
+        "title": "As the Wind Changes",
+        "bpm": 60,
+        "energy": "low",
+        "mood": [
+          "drama",
+          "hopeful",
+          "no-vocals",
+          "peaceful",
+          "solo-piano"
+        ],
+        "duration_s": 141.9,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: As the Wind Changes"
+      },
+      {
+        "file": "ambient_06.mp3",
+        "epidemic_id": "ac72d739-474a-38f1-9cb3-ef777b72a29a",
+        "title": "Do No Wrong",
+        "bpm": 75,
+        "energy": "low",
+        "mood": [
+          "drama",
+          "dreamy",
+          "no-vocals",
+          "peaceful",
+          "solo-piano"
+        ],
+        "duration_s": 133.7,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Do No Wrong"
+      }
+    ],
+    "tense": [
+      {
+        "file": "tense_02.mp3",
+        "epidemic_id": "21911c4c-8596-3cc1-b7d4-e1134360f58e",
+        "title": "Wolf Signal",
+        "bpm": 100,
+        "energy": "high",
+        "mood": [
+          "ambient",
+          "dark",
+          "drone",
+          "mysterious",
+          "no-vocals"
+        ],
+        "duration_s": 94.2,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Wolf Signal"
+      },
+      {
+        "file": "tense_03.mp3",
+        "epidemic_id": "ce31335c-01fc-3d45-932a-00c346c9a544",
+        "title": "Steady Tension",
+        "bpm": 100,
+        "energy": "high",
+        "mood": [
+          "ambient",
+          "dark",
+          "drone",
+          "fear",
+          "no-vocals"
+        ],
+        "duration_s": 105.6,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Steady Tension"
+      },
+      {
+        "file": "tense_04.mp3",
+        "epidemic_id": "e5951df7-4893-3f16-a3e4-a93787462e09",
+        "title": "Political Motivation",
+        "bpm": 120,
+        "energy": "high",
+        "mood": [
+          "ambient",
+          "drone",
+          "no-vocals",
+          "restless",
+          "suspense"
+        ],
+        "duration_s": 120.5,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Political Motivation"
+      },
+      {
+        "file": "tense_05.mp3",
+        "epidemic_id": "c2bee2b0-4df1-39be-aea4-5eaf9d0c266f",
+        "title": "The Board Is Set",
+        "bpm": 133,
+        "energy": "high",
+        "mood": [
+          "adventure",
+          "dark",
+          "epic",
+          "no-vocals"
+        ],
+        "duration_s": 152.2,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: The Board Is Set"
+      },
+      {
+        "file": "tense_06.mp3",
+        "epidemic_id": "9c182774-ce27-4540-af6d-9b6bdc2ea704",
+        "title": "Kumo",
+        "bpm": 141,
+        "energy": "high",
+        "mood": [
+          "beats",
+          "dark",
+          "dreamy",
+          "no-vocals",
+          "trap"
+        ],
+        "duration_s": 144.7,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Kumo"
+      }
+    ],
+    "hopeful": [
+      {
+        "file": "hopeful_02.mp3",
+        "epidemic_id": "64230345-b3bd-35d8-adde-64ba6adb31ca",
+        "title": "What Made Us Feel Human",
+        "bpm": 64,
+        "energy": "medium",
+        "mood": [
+          "ambient",
+          "drama",
+          "hopeful",
+          "no-vocals",
+          "sentimental"
+        ],
+        "duration_s": 132.2,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: What Made Us Feel Human"
+      },
+      {
+        "file": "hopeful_03.mp3",
+        "epidemic_id": "556307a9-def4-3684-bf78-fde3f21d9a80",
+        "title": "The Languid Line",
+        "bpm": 100,
+        "energy": "medium",
+        "mood": [
+          "ambient",
+          "drama",
+          "dreamy",
+          "drone",
+          "hopeful"
+        ],
+        "duration_s": 127.2,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: The Languid Line"
+      },
+      {
+        "file": "hopeful_04.mp3",
+        "epidemic_id": "d43f99eb-e611-4534-94a1-6ffca9dc6ba3",
+        "title": "Echoes of Hope",
+        "bpm": 80,
+        "energy": "medium",
+        "mood": [
+          "acoustic",
+          "dreamy",
+          "folk-pop",
+          "hopeful",
+          "no-vocals"
+        ],
+        "duration_s": 199.2,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Echoes of Hope"
+      },
+      {
+        "file": "hopeful_05.mp3",
+        "epidemic_id": "a386c297-b20e-3b4e-b333-464969a7d82c",
+        "title": "Friends for Life",
+        "bpm": 77,
+        "energy": "medium",
+        "mood": [
+          "beautiful",
+          "drama",
+          "happy",
+          "hopeful",
+          "no-vocals"
+        ],
+        "duration_s": 115.9,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Friends for Life"
+      },
+      {
+        "file": "hopeful_06.mp3",
+        "epidemic_id": "f000c81b-c3dc-4afd-8cf2-cacc571588fc",
+        "title": "Alone in Our Home (Instrumental Version)",
+        "bpm": 60,
+        "energy": "medium",
+        "mood": [
+          "contemporary-folk",
+          "folk-rock",
+          "indie-folk",
+          "laid-back",
+          "no-vocals"
+        ],
+        "duration_s": 212.0,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Alone in Our Home (Instrumental Version) \u2014 indie-folk/laid-back; borderline hopeful fit; usable for quiet rescue resolution moments"
+      }
+    ],
+    "epic": [
+      {
+        "file": "epic_02.mp3",
+        "epidemic_id": "0d7b43ff-b801-4698-a0f9-a1e88c28e0b1",
+        "title": "Origin",
+        "bpm": 94,
+        "energy": "high",
+        "mood": [
+          "cinematic",
+          "contemporary-classical",
+          "epic",
+          "hopeful",
+          "no-vocals"
+        ],
+        "duration_s": 160.3,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Origin"
+      },
+      {
+        "file": "epic_03.mp3",
+        "epidemic_id": "d2914c5d-5d39-3d6e-98c9-eee21777b2ed",
+        "title": "There's a Hole in the World",
+        "bpm": 139,
+        "energy": "high",
+        "mood": [
+          "alternative-rock",
+          "contemporary-folk",
+          "dreamy",
+          "epic",
+          "vocal-presence"
+        ],
+        "duration_s": 217.6,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: There's a Hole in the World"
+      },
+      {
+        "file": "epic_04.mp3",
+        "epidemic_id": "7a529807-22b2-364f-a547-61bca39e2745",
+        "title": "Vatican Mystery",
+        "bpm": 113,
+        "energy": "high",
+        "mood": [
+          "adventure",
+          "changing-tempo",
+          "choral",
+          "dark",
+          "epic"
+        ],
+        "duration_s": 60.8,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Vatican Mystery"
+      }
+    ],
+    "sad_resolve": [
+      {
+        "file": "sad_resolve_02.mp3",
+        "epidemic_id": "f359bc0f-c261-46d1-ae2a-11d3d0375d90",
+        "title": "Deliverance",
+        "bpm": 85,
+        "energy": "low",
+        "mood": [
+          "contemporary-classical",
+          "dark",
+          "no-vocals",
+          "sad"
+        ],
+        "duration_s": 231.2,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Deliverance"
+      },
+      {
+        "file": "sad_resolve_03.mp3",
+        "epidemic_id": "f1d7b9cb-fd23-41f8-b6c3-dcf2596c516a",
+        "title": "Ruins of Hate",
+        "bpm": 60,
+        "energy": "low",
+        "mood": [
+          "contemporary-classical",
+          "no-vocals",
+          "sad",
+          "suspense"
+        ],
+        "duration_s": 189.4,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Ruins of Hate"
+      },
+      {
+        "file": "sad_resolve_04.mp3",
+        "epidemic_id": "39a54659-4b80-47a8-8318-dcba54b82316",
+        "title": "Doubts",
+        "bpm": 80,
+        "energy": "low",
+        "mood": [
+          "contemporary-classical",
+          "dark",
+          "no-vocals",
+          "sad"
+        ],
+        "duration_s": 227.8,
+        "source": "epidemic_sound",
+        "notes": "Epidemic Sound: Doubts"
+      }
+    ]
+  }
+}

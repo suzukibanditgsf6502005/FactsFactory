@@ -1,0 +1,16 @@
+.env
+inbox/
+output/
+logs/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.idea/
+.vscode/
+
+# Music tracks (licensed — do not commit)
+assets/music/**/*.mp3

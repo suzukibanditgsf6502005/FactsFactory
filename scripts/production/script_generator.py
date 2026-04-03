@@ -32,26 +32,25 @@ Script structure (strict):
 1. Hook (first 3–4 seconds): A question or surprising statement that creates immediate intrigue.
    - Must reference the hook_fact from the research brief
    - No "Today we're looking at...", no "Did you know that..." openers
-   - Examples: "This animal can punch faster than a bullet." / "For 600 million years, this creature has barely changed."
-2. Narration (main body): Deliver 5–7 facts in order, building toward the most mind-blowing
-   - Paced for spoken delivery — short sentences, natural rhythm
-   - Use "..." for natural pauses where breath is needed
-   - Build from surprising → more surprising → most surprising
-3. Payoff + CTA (final 3 seconds): Land the emotional payoff, then a natural follow CTA
-   - CTA must feel organic, not forced: "Follow if that blew your mind." / "More wild facts daily."
+   - Strong verb + specific noun. Examples:
+     "This shrimp punches faster than a bullet." / "Octopuses stop their own heart every time they swim."
+2. Narration body: Deliver 4–6 facts, punchy and conversational — NOT textbook.
+   - Short sentences. One idea per sentence. Natural spoken rhythm.
+   - Use "..." for pauses where a beat is needed.
+   - Build: surprising → more surprising → payoff.
+3. Payoff + CTA (last 2–3 seconds): Land the emotional kicker, then one short follow line.
+   - CTA must feel organic: "Follow for more." / "More tomorrow." / "You won't unsee this."
 
-Word count targets for narration duration:
-- 25s target: ~65 words
-- 30s target: ~80 words
-- 35s target: ~95 words
-- 40s target: ~110 words
-- 45s target: ~125 words
+HARD WORD COUNT LIMIT — you must not exceed the max_words specified in the prompt.
+Count your words before returning. If over, cut until you are at or under the limit.
+Prefer cutting from the middle body. Never cut the hook or payoff.
 
 Rules:
 - English only
 - Ground script strictly in provided facts — no invented details
-- Never use passive voice for the hook
-- Title variants must use curiosity-gap or emotion-led angles — no "10 facts about X"
+- Never use passive voice in the hook
+- Avoid "nature is amazing", "evolution is incredible" filler phrases
+- Title variants must use curiosity-gap or tension angles — no "X facts about Y"
 - Return ONLY valid JSON. No markdown, no explanation, no code fences."""
 
 USER_PROMPT_TEMPLATE = """Write a YouTube Shorts narration script from this factual research brief.
@@ -60,38 +59,36 @@ Topic: {topic}
 Category: {category}
 Hook angle: {hook_angle}
 Hook fact (must open the script): {hook_fact}
-Target duration: {target_duration} seconds (~{target_words} words total)
-Emotional angle to pursue: {emotional_angle_hint}
+Target duration: {target_duration} seconds
+HARD LIMIT: full_script must be {max_words} words or fewer. Count before returning.
+Emotional angle: {emotional_angle_hint}
 
 Factual brief:
 {factual_brief}
 
-Facts to draw from (use 5–7, ordered by impact):
+Facts to draw from (pick 4–6, use the highest-impact ones):
 {facts_text}
 
-Return ONLY valid JSON in this exact structure:
+Return ONLY valid JSON:
 {{
   "topic": "{topic}",
-  "hook": "Opening line(s) — first 3–4 seconds of spoken audio",
-  "narration": "Main body narration — everything after the hook and before the CTA",
-  "cta": "Final 1-sentence call to action",
-  "full_script": "hook + narration + cta combined, ready for TTS. Use '...' for pauses.",
+  "hook": "Opening — first 3 seconds of spoken audio",
+  "narration": "Body — after hook, before CTA",
+  "cta": "Final 1 short sentence",
+  "full_script": "hook + narration + cta, TTS-ready, pauses as '...'",
   "title_variants": [
-    "Title option 1 — curiosity gap",
-    "Title option 2 — emotion-led",
-    "Title option 3 — outcome/payoff",
-    "Title option 4 — question format"
+    "Title 1 — curiosity gap",
+    "Title 2 — tension/stakes",
+    "Title 3 — outcome reveal",
+    "Title 4 — question"
   ],
   "emotional_angle": "wonder|surprise|awe|admiration|humor|disbelief",
-  "estimated_duration_seconds": 35,
-  "word_count": 95
+  "estimated_duration_seconds": {target_duration},
+  "word_count": 0
 }}
 
-Validation checklist (apply before returning):
-- word_count matches actual word count of full_script
-- estimated_duration_seconds = word_count / 2.75 (rounded to nearest integer)
-- full_script = hook + " " + narration + " " + cta
-- All facts in script are sourced from the provided facts list"""
+Before returning: count the words in full_script, set word_count to that number.
+If word_count > {max_words}, trim the narration body until it fits."""
 
 
 def _parse_json_response(raw: str) -> dict:
@@ -119,6 +116,7 @@ def _target_words(duration: int) -> int:
 def _emotional_angle_hint(category: str, hook_angle: str) -> str:
     hints = {
         "animal_facts": "wonder and disbelief — nature is stranger than fiction",
+        "weird_biology": "visceral surprise and dark fascination — life is weirder than horror fiction",
         "history": "surprise and inevitability — you won't believe this happened",
         "science": "awe — the universe is more complex than we imagined",
         "space": "awe and smallness — perspective-shifting scale",
@@ -143,13 +141,16 @@ def generate_script(research: dict, target_duration: int = 35) -> dict:
         for i, f in enumerate(facts_sorted)
     )
 
+    # max_words: 5 words buffer below the target to keep TTS from drifting over
+    max_words = _target_words(target_duration) - 5
+
     prompt = USER_PROMPT_TEMPLATE.format(
         topic=research["topic"],
         category=research.get("category", "animal_facts"),
         hook_angle=research.get("hook_angle", ""),
         hook_fact=research["hook_fact"],
         target_duration=target_duration,
-        target_words=_target_words(target_duration),
+        max_words=max_words,
         emotional_angle_hint=_emotional_angle_hint(research.get("category", ""), research.get("hook_angle", "")),
         factual_brief=research["factual_brief"],
         facts_text=facts_text,

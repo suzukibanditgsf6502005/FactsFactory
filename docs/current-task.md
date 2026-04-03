@@ -8,16 +8,15 @@
 
 ## Current Objective
 
-**Phase:** Text spine implemented — all 4 research/script modules functional; orchestrator available.
+**Phase:** Text spine validated — 10 runs across animal_facts + weird_biology; critical issues fixed; spine ready for image generation.
 
-**Immediate goal:** Run the full spine end-to-end with a real API key and validate output quality.
-Then decide image generation provider to unblock `scene_image_generator.py`.
+**Immediate goal:** Choose image generation provider (Flux/DALL-E 3/Ideogram) and implement `scene_image_generator.py`.
 
 ---
 
 ## What Is Being Worked On RIGHT NOW
 
-Text spine implemented. Awaiting: (1) .env setup, (2) end-to-end live test.
+Nothing active. Validation complete. Waiting for human decision on image generation provider.
 
 ---
 
@@ -25,10 +24,10 @@ Text spine implemented. Awaiting: (1) .env setup, (2) end-to-end live test.
 
 | Component | Version | Status |
 |---|---|---|
-| topic_selector.py | v1 | ✅ functional — needs .env + live test |
-| fact_research.py | v1 | ✅ functional — needs .env + live test |
-| script_generator.py | v1 | ✅ functional — needs .env + live test |
-| storyboard_generator.py | v1 | ✅ functional — needs .env + live test |
+| topic_selector.py | v2 | ✅ validated — diversity fix, category descriptions |
+| fact_research.py | v1 | ✅ validated — facts accurate, well-structured |
+| script_generator.py | v2 | ✅ validated — hooks strong, duration mostly on target |
+| storyboard_generator.py | v1 | ✅ validated — 7–9 scenes, image prompts usable |
 | scene_image_generator.py | scaffold | ⚠️ scaffold only — not functional |
 | scene_animator.py | scaffold | ⚠️ scaffold only — not functional |
 | voiceover.py | inherited | ✅ functional (from PawFactory) |
@@ -55,16 +54,14 @@ Text spine implemented. Awaiting: (1) .env setup, (2) end-to-end live test.
 
 ## Next Steps (in order)
 
-1. **Set up .env** — copy from PawFactory: `cp /home/ai-machine/source/PawFactory/.env .env`
-2. **Live end-to-end test**:
-   ```bash
-   source venv/bin/activate
-   python scripts/run_spine.py --category animal_facts --dry-run   # dry run first
-   python scripts/run_spine.py --category animal_facts             # save artifacts
-   ```
-3. **Review outputs** — check topic, facts, script, storyboard quality; iterate prompts if needed
-4. **Decide image generation provider** — options: DALL-E 3, Flux (fal.ai/Replicate), Ideogram
-   (do not integrate until provider chosen and approved by human)
-5. **Implement `scene_image_generator.py`** — once provider approved
-6. **Wire voiceover + video_editor** to accept scene sequence input
-7. **End-to-end media test** — topic → facts → script → stills → voice → video → QC → queue
+1. **Human: choose image generation provider:**
+   - Flux via fal.ai: ~$0.003–0.008/image, fast, good quality, 8 images/short = ~$0.024–0.064
+   - DALL-E 3: ~$0.040/image, 8 images/short = ~$0.32 — higher cost, strong prompt adherence
+   - Ideogram: ~$0.08/image, strong text rendering (not needed for facts), 8 images/short = ~$0.64
+   - **Recommendation: Flux via fal.ai** — best cost/quality for photorealistic animal imagery
+2. **Fix storyboard image prompt quality** — add visual descriptions of organisms alongside Latin names
+3. **Implement `scene_image_generator.py`** — once provider approved
+4. **Fix repeated closing phrases** — "Biology is darker than horror fiction" used twice; add variation
+5. **Implement `scene_animator.py`** — Ken Burns via ffmpeg zoompan
+6. **Adapt `video_editor.py`** — accept animated scene sequence + voiceover → assembled short
+7. **End-to-end media test** — topic → stills → voice → video → QC → queue

@@ -7,25 +7,27 @@
 
 ## Current State — 2026-04-03
 
-- **Phase:** Bootstrap complete
-- **Shorts produced:** 0 (pipeline not yet end-to-end)
-- **Pipeline status:** Inherited production modules functional; new research/script modules scaffolded only
+- **Phase:** Text spine validated — ready for image generation integration
+- **Shorts produced:** 0 (image generation not yet implemented)
+- **Pipeline status:** Text spine (topic → research → script → storyboard) functional and validated
 - **Publishing system:** Inherited from PawFactory — awaiting credential configuration
+- **Validation:** 10 runs across animal_facts + weird_biology; 3 critical issues found and fixed
 
 ---
 
 ## Module Status
 
-### New FactsFactory Modules (scaffold — not yet functional)
+### New FactsFactory Modules
 
 | Module | Status | Notes |
 |---|---|---|
-| `scripts/research/topic_selector.py` | SCAFFOLD | Interface documented; Claude Haiku call not yet wired |
-| `scripts/research/fact_research.py` | SCAFFOLD | Interface documented; Claude Sonnet call not yet wired |
-| `scripts/production/script_generator.py` | SCAFFOLD | Interface documented; not yet wired |
-| `scripts/production/storyboard_generator.py` | SCAFFOLD | Interface documented; not yet wired |
-| `scripts/production/scene_image_generator.py` | SCAFFOLD | Provider TBD; not yet wired |
-| `scripts/production/scene_animator.py` | SCAFFOLD | ffmpeg Ken Burns approach documented; not yet wired |
+| `scripts/research/topic_selector.py` | ✅ v2 VALIDATED | Category descriptions; random top-3 diversity; 8 categories |
+| `scripts/research/fact_research.py` | ✅ v1 VALIDATED | 8–10 facts, ordered by impact, strict JSON |
+| `scripts/production/script_generator.py` | ✅ v2 VALIDATED | Hard word count limit; Shorts-native hooks |
+| `scripts/production/storyboard_generator.py` | ✅ v1 VALIDATED | 7–9 scenes; image prompts usable |
+| `scripts/run_spine.py` | ✅ v1 WORKING | Full orchestrator; --dry-run; resume from any stage |
+| `scripts/production/scene_image_generator.py` | SCAFFOLD | Provider TBD — pending human approval |
+| `scripts/production/scene_animator.py` | SCAFFOLD | ffmpeg Ken Burns approach documented |
 
 ### Inherited Functional Modules
 

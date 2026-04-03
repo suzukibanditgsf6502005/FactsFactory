@@ -5,6 +5,33 @@
 
 ---
 
+## 2026-04-03 — Text spine validation pass: 10 runs, critical issues fixed
+
+**What was done:**
+- Copied .env from PawFactory; confirmed ANTHROPIC_API_KEY present
+- Added `weird_biology` to CATEGORIES in topic_selector.py, run_spine.py, script_generator.py
+- Ran 6 pre-fix batches (animal_facts × 5, weird_biology × 1) — identified critical issues
+- Identified and fixed 3 issues:
+  1. Topic diversity: selector was deterministic → always octopus (fixed: random top-3 pick)
+  2. Category context: weird_biology produced animal_facts topics (fixed: CATEGORY_DESCRIPTIONS)
+  3. Word count drift: 107–125w vs 96w target (fixed: HARD LIMIT instruction + max_words)
+- Ran 4 post-fix validation runs (animal_facts × 2, weird_biology × 2)
+- Post-fix quality: 3 distinct topics, 95–110 words, Shorts-native hooks, strong scripts
+- Remaining minor issues documented: repeated closing phrase, storyboard duration gap, image prompt specificity
+- Wrote validation summary: logs/validation/spine_validation_20260403.md
+- Updated docs: current-task, resume-handoff, progress-log, status-report
+
+**Files changed:**
+- scripts/research/topic_selector.py (v1 → v2): category descriptions + random top-3
+- scripts/production/script_generator.py (v1 → v2): hard word count limit + cleaner prompt
+- scripts/run_spine.py: weird_biology added to CATEGORIES
+- docs/current-task.md, docs/resume-handoff.md, docs/progress-log.md, docs/status-report.md
+- logs/validation/spine_validation_20260403.md (new)
+
+**Next step:** Human decides image generation provider; implement scene_image_generator.py
+
+---
+
 ## 2026-04-03 — Text spine implemented: topic → research → script → storyboard
 
 **What was done:**

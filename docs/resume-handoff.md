@@ -6,7 +6,7 @@
 
 ---
 
-## System State — 2026-04-03 (text spine implemented)
+## System State — 2026-04-03 (text spine validated)
 
 ### Completed
 
@@ -22,55 +22,63 @@
 | script_generator.py | v1 — Claude Sonnet, hook + narration + CTA + 4 title variants, ~35s target |
 | storyboard_generator.py | v1 — Claude Haiku, 7–9 scenes with image prompts + motion hints |
 | run_spine.py | v1 — orchestrator: full chain or resume from any stage, --dry-run mode |
-| JSON contracts | All 4 modules have documented input/output schemas |
-| CLIs | All 4 modules have working argparse CLIs |
-| venv | Created at FactsFactory/venv with anthropic + python-dotenv |
+| Validation pass | 10 runs (6 pre-fix, 4 post-fix): critical issues found and fixed |
+| topic_selector.py | v2 — category descriptions added; random top-3 pick for diversity |
+| script_generator.py | v2 — hard word count limit enforced; cleaner system prompt |
+| weird_biology category | Added to all modules; produces correct disturbing/parasite content |
+| Validation summary | logs/validation/spine_validation_20260403.md |
 
 ### In Progress
 
-.env not yet set up in FactsFactory. Live API test not yet run.
+Waiting for human decision on image generation provider.
 
 ### What Remains (ordered priority)
 
-1. **Set up .env** — `cp /home/ai-machine/source/PawFactory/.env .env`
-2. **Live end-to-end test** — `python scripts/run_spine.py --category animal_facts --dry-run`
-3. **Review + iterate prompts** — check topic/fact/script/storyboard quality after first live run
-4. **Decide image generation provider** — present options to human (DALL-E 3, Flux, Ideogram)
-5. **Implement `scene_image_generator.py`** — once provider approved
-6. **Implement `scene_animator.py`** — Ken Burns via ffmpeg zoompan (documented in scaffold)
-7. **Adapt `video_editor.py`** — accept animated scene sequence instead of single-clip input
-8. **End-to-end media test** — topic → stills → voice → video → QC → queue
-9. **YouTube OAuth2 setup** — `python scripts/publishing/youtube_uploader.py --auth`
+1. **Human: choose image generation provider** (see cost breakdown in current-task.md)
+   - Recommendation: Flux via fal.ai (~$0.003–0.008/image, ~$0.024–0.064/short)
+2. **Fix storyboard image prompts** — add visual creature descriptions alongside Latin names
+3. **Implement `scene_image_generator.py`** — once provider chosen
+4. **Fix repeated closing phrases** — "Biology is darker than horror fiction" used twice in weird_biology
+5. **Implement `scene_animator.py`** — Ken Burns via ffmpeg zoompan
+6. **Adapt `video_editor.py`** — accept animated scene sequence + voiceover
+7. **End-to-end media test** — topic → stills → voice → video → QC → queue
+8. **YouTube OAuth2 setup** — `python scripts/publishing/youtube_uploader.py --auth`
 
 ### Blockers
 
-`.env` not copied to FactsFactory. All text modules are ready; API cannot be called until .env exists.
+None for text spine. Image generation blocked on human provider decision.
 
 ---
 
 ## Exact Next Action
 
+**If implementing image generation (once provider chosen):**
 ```bash
 cd /home/ai-machine/source/FactsFactory
-
-# 1. Set up environment
-cp /home/ai-machine/source/PawFactory/.env .env
 source venv/bin/activate
 
-# 2. Dry run first (no API calls to image gen; text spine only)
-python scripts/run_spine.py --category animal_facts --dry-run
-
-# 3. Full run (saves artifacts to logs/)
+# Generate fresh content for image testing
 python scripts/run_spine.py --category animal_facts
+# Then implement scene_image_generator.py for that storyboard
+```
 
-# 4. Inspect outputs
-cat logs/topics/*.json | python3 -m json.tool | head -30
-cat logs/scripts/*.json | python3 -m json.tool | grep -A3 '"hook"'
-cat logs/storyboards/*.json | python3 -m json.tool | grep '"narration_segment"'
+**If running more content for the text spine:**
+```bash
+source venv/bin/activate
+python scripts/run_spine.py --category animal_facts
+python scripts/run_spine.py --category weird_biology
 
-# 5. Re-run from a saved stage (skip re-generating if happy with topic/research)
-python scripts/run_spine.py --research-file logs/research/TIMESTAMP_slug.json
-python scripts/run_spine.py --script-file logs/scripts/TIMESTAMP_slug.json
+# Inspect scripts quickly
+for f in logs/scripts/*.json; do python3 -c "
+import json; d=json.load(open('$f'))
+print(d['topic'][:60], '|', d['word_count'], 'w', d['estimated_duration_seconds'], 's')
+print('HOOK:', d['hook'][:80])
+"; done
+```
+
+**Validation summary:**
+```
+logs/validation/spine_validation_20260403.md
 ```
 
 ---

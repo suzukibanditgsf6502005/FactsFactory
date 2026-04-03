@@ -40,7 +40,7 @@ from scripts.production.script_generator import generate_script
 from scripts.production.storyboard_generator import generate_storyboard
 
 CATEGORIES = [
-    "animal_facts", "history", "science", "space",
+    "animal_facts", "weird_biology", "history", "science", "space",
     "engineering", "psychology", "records",
 ]
 

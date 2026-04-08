@@ -1,6 +1,6 @@
 # Current Task
 
-> Last updated: 2026-04-03
+> Last updated: 2026-04-09
 > This file describes what is being worked on right now and what comes next.
 > Update this file at the start and end of every session.
 
@@ -8,15 +8,15 @@
 
 ## Current Objective
 
-**Phase:** Text spine validated — 10 runs across animal_facts + weird_biology; critical issues fixed; spine ready for image generation.
+**Phase:** Multi-style pipeline implemented — cinematic / cartoon / motion styles routing through `main.py`.
 
-**Immediate goal:** Choose image generation provider (Flux/DALL-E 3/Ideogram) and implement `scene_image_generator.py`.
+**Immediate goal:** Run a real 3-short validation batch using `main.py --style motion` (no image API cost) and `--style cartoon` (fal.ai).
 
 ---
 
 ## What Is Being Worked On RIGHT NOW
 
-Nothing active. Validation complete. Waiting for human decision on image generation provider.
+Nothing active. Multi-style refactor complete.
 
 ---
 
@@ -24,22 +24,25 @@ Nothing active. Validation complete. Waiting for human decision on image generat
 
 | Component | Version | Status |
 |---|---|---|
-| topic_selector.py | v2 | ✅ validated — diversity fix, category descriptions |
-| fact_research.py | v1 | ✅ validated — facts accurate, well-structured |
-| script_generator.py | v2 | ✅ validated — hooks strong, duration mostly on target |
-| storyboard_generator.py | v1 | ✅ validated — 7–9 scenes, image prompts usable |
-| scene_image_generator.py | scaffold | ⚠️ scaffold only — not functional |
-| scene_animator.py | scaffold | ⚠️ scaffold only — not functional |
-| voiceover.py | inherited | ✅ functional (from PawFactory) |
-| music_mixer.py | inherited | ✅ functional (from PawFactory) |
-| video_editor.py | inherited | ✅ functional (from PawFactory) |
-| ass_captions.py | v3.1.1 inherited | ✅ functional (from PawFactory) |
-| quality_check.py | v2 inherited | ✅ functional (from PawFactory) |
-| metadata_gen.py | inherited | ✅ functional (from PawFactory) |
-| publish_queue.py | inherited | ✅ functional (from PawFactory) |
+| topic_selector.py | v2 | ✅ validated |
+| fact_research.py | v1 | ✅ validated |
+| script_generator.py | v2 | ✅ validated |
+| storyboard_generator.py | v1 | ✅ validated |
+| scene_generators/base.py | v1 | ✅ new — abstract base |
+| scene_generators/motion.py | v1 | ✅ new — kinetic typography, no API |
+| scene_generators/cartoon.py | v1 | ✅ new — fal.ai/DALL-E + Ken Burns |
+| scene_generators/cinematic.py | v1 | ✅ new — Veo scaffold + Runway scaffold + FLUX fallback |
+| main.py | v1 | ✅ new — full pipeline entry, --style all |
+| scene_image_generator.py | v1 | ✅ functional (used by cartoon + cinematic fallback) |
+| scene_animator.py | v1 | ✅ functional (pan bug fixed) |
+| assemble_video.py | v1 | ✅ functional |
+| ass_captions.py | v3+ | ✅ functional (temp-file burn fix applied) |
+| voiceover.py | inherited | ✅ functional (ElevenLabs, voice Lily) |
+| music_mixer.py | inherited | ✅ functional |
+| quality_check.py | v2 inherited | ✅ functional |
+| metadata_gen.py | inherited | ✅ functional |
+| publish_queue.py | inherited | ✅ functional |
 | youtube_uploader.py | inherited | ✅ built — needs OAuth2 credentials |
-| reddit_scraper.py | LEGACY | ⚠️ functional but not core FactsFactory path |
-| downloader.py | LEGACY | ⚠️ functional but not core FactsFactory path |
 
 ---
 
@@ -54,14 +57,9 @@ Nothing active. Validation complete. Waiting for human decision on image generat
 
 ## Next Steps (in order)
 
-1. **Human: choose image generation provider:**
-   - Flux via fal.ai: ~$0.003–0.008/image, fast, good quality, 8 images/short = ~$0.024–0.064
-   - DALL-E 3: ~$0.040/image, 8 images/short = ~$0.32 — higher cost, strong prompt adherence
-   - Ideogram: ~$0.08/image, strong text rendering (not needed for facts), 8 images/short = ~$0.64
-   - **Recommendation: Flux via fal.ai** — best cost/quality for photorealistic animal imagery
-2. **Fix storyboard image prompt quality** — add visual descriptions of organisms alongside Latin names
-3. **Implement `scene_image_generator.py`** — once provider approved
-4. **Fix repeated closing phrases** — "Biology is darker than horror fiction" used twice; add variation
-5. **Implement `scene_animator.py`** — Ken Burns via ffmpeg zoompan
-6. **Adapt `video_editor.py`** — accept animated scene sequence + voiceover → assembled short
-7. **End-to-end media test** — topic → stills → voice → video → QC → queue
+1. **Run motion batch** — 2–3 shorts via `python main.py --style motion --category animal_facts`
+2. **Run cartoon batch** — 1–2 shorts via `python main.py --style cartoon --category weird_biology`
+3. **Evaluate quality** — inspect outputs, note remaining weaknesses
+4. **YouTube OAuth2 setup** — `python scripts/publishing/youtube_uploader.py --auth`
+5. **Wire Runway API** — add RUNWAY_API_KEY to .env when ready to use cinematic style properly
+6. **Wire Veo API** — when Google makes Veo publicly available via API

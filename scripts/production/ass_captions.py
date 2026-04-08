@@ -598,10 +598,17 @@ def main():
     if not ass_path:
         sys.exit(1)
 
+    # Burn to a temp file then replace, in case input == output path
+    import tempfile
+    import shutil
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+        tmp_path = tmp.name
     final_out = output_dir / f"{args.video_id}_final.mp4"
-    if not burn_ass_captions(args.video, ass_path, str(final_out)):
+    if not burn_ass_captions(args.video, ass_path, tmp_path):
+        Path(tmp_path).unlink(missing_ok=True)
         sys.exit(1)
 
+    shutil.move(tmp_path, final_out)
     size_mb = final_out.stat().st_size / (1024 * 1024)
     console.print(f"[green]✓ Done: {final_out.name} ({size_mb:.1f} MB)[/green]")
 

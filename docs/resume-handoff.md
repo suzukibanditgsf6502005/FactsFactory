@@ -6,152 +6,141 @@
 
 ---
 
-## System State — 2026-04-03 (text spine validated)
+## System State — 2026-04-09 (multi-style pipeline complete)
 
 ### Completed
 
 | Item | Detail |
 |---|---|
-| Bootstrap | FactsFactory created from sanitized PawFactory snapshot (commit ea76e33) |
-| GitHub repo | Created and pushed at github.com/suzukibanditgsf6502005/FactsFactory |
-| Architecture pivot | Docs, CLAUDE.md, README renamed and pivoted to FactsFactory / facts shorts |
-| Inherited modules | voiceover, music_mixer, video_editor, ass_captions, quality_check, metadata_gen, publish_queue, youtube_uploader, tiktok_publisher — all functional from PawFactory |
-| Legacy modules | reddit_scraper, downloader, hook_generator, smart_clipper, visual_sampler, run_pipeline — preserved, marked as LEGACY |
-| topic_selector.py | v1 — Claude Haiku, 5 candidates, scored, top pick returned as JSON |
-| fact_research.py | v1 — Claude Sonnet, 8–10 facts ordered by impact, strict JSON |
-| script_generator.py | v1 — Claude Sonnet, hook + narration + CTA + 4 title variants, ~35s target |
-| storyboard_generator.py | v1 — Claude Haiku, 7–9 scenes with image prompts + motion hints |
-| run_spine.py | v1 — orchestrator: full chain or resume from any stage, --dry-run mode |
-| Validation pass | 10 runs (6 pre-fix, 4 post-fix): critical issues found and fixed |
-| topic_selector.py | v2 — category descriptions added; random top-3 pick for diversity |
-| script_generator.py | v2 — hard word count limit enforced; cleaner system prompt |
-| weird_biology category | Added to all modules; produces correct disturbing/parasite content |
-| Validation summary | logs/validation/spine_validation_20260403.md |
+| Bootstrap | FactsFactory created from sanitized PawFactory snapshot |
+| GitHub repo | github.com/suzukibanditgsf6502005/FactsFactory |
+| Text spine | topic_selector → fact_research → script_generator → storyboard_generator — validated |
+| scene_image_generator.py | fal.ai Flux primary, OpenAI DALL-E fallback |
+| scene_animator.py | Ken Burns via ffmpeg zoompan (pan bug fixed — uses `on` variable) |
+| assemble_video.py | concat + voiceover + music → final mp4 |
+| ass_captions.py | Whisper + Claude Haiku + ASS burn (temp-file fix applied) |
+| **main.py** | **NEW: Full pipeline entry point with --style routing** |
+| **scene_generators/base.py** | **NEW: SceneGenerator abstract base class** |
+| **scene_generators/motion.py** | **NEW: Kinetic typography — pure ffmpeg, no image API** |
+| **scene_generators/cartoon.py** | **NEW: fal.ai/DALL-E images + Ken Burns animation** |
+| **scene_generators/cinematic.py** | **NEW: Veo scaffold + Runway scaffold + FLUX fallback** |
+| First short | output/wasp-test-001_captioned.mp4 (zombie wasp, 48.4s, with captions) |
+| Motion test | output/motion-test-001_final.mp4 (kinetic typography, verified) |
 
 ### In Progress
 
-Waiting for human decision on image generation provider.
+Nothing. Ready for validation batch.
 
 ### What Remains (ordered priority)
 
-1. **Human: choose image generation provider** (see cost breakdown in current-task.md)
-   - Recommendation: Flux via fal.ai (~$0.003–0.008/image, ~$0.024–0.064/short)
-2. **Fix storyboard image prompts** — add visual creature descriptions alongside Latin names
-3. **Implement `scene_image_generator.py`** — once provider chosen
-4. **Fix repeated closing phrases** — "Biology is darker than horror fiction" used twice in weird_biology
-5. **Implement `scene_animator.py`** — Ken Burns via ffmpeg zoompan
-6. **Adapt `video_editor.py`** — accept animated scene sequence + voiceover
-7. **End-to-end media test** — topic → stills → voice → video → QC → queue
-8. **YouTube OAuth2 setup** — `python scripts/publishing/youtube_uploader.py --auth`
+1. **Run 2–3 motion shorts** — `python main.py --style motion --category animal_facts`
+2. **Run 1–2 cartoon shorts** — `python main.py --style cartoon --category weird_biology`
+3. **Evaluate and document quality** — logs/validation/
+4. **YouTube OAuth2 setup** — `python scripts/publishing/youtube_uploader.py --auth`
+5. **Runway API wiring** — add RUNWAY_API_KEY to .env for true cinematic style
+6. **Veo integration** — when Google opens Veo API publicly
 
 ### Blockers
 
-None for text spine. Image generation blocked on human provider decision.
+None. All 3 styles functional (cinematic falls back to FLUX if no video API keys).
 
 ---
 
 ## Exact Next Action
 
-**If implementing image generation (once provider chosen):**
 ```bash
 cd /home/ai-machine/source/FactsFactory
 source venv/bin/activate
 
-# Generate fresh content for image testing
-python scripts/run_spine.py --category animal_facts
-# Then implement scene_image_generator.py for that storyboard
-```
+# Run a motion short (fast, no image API cost)
+python main.py --style motion --category animal_facts
 
-**If running more content for the text spine:**
-```bash
-source venv/bin/activate
-python scripts/run_spine.py --category animal_facts
-python scripts/run_spine.py --category weird_biology
+# Run a cartoon short
+python main.py --style cartoon --category weird_biology
 
-# Inspect scripts quickly
-for f in logs/scripts/*.json; do python3 -c "
-import json; d=json.load(open('$f'))
-print(d['topic'][:60], '|', d['word_count'], 'w', d['estimated_duration_seconds'], 's')
-print('HOOK:', d['hook'][:80])
-"; done
-```
-
-**Validation summary:**
-```
-logs/validation/spine_validation_20260403.md
+# Run all 3 styles from same script
+python main.py --style all --category science
 ```
 
 ---
+
+## Pipeline Architecture
+
+```
+topic_selector → fact_research → script_generator → storyboard_generator
+                                                              ↓
+                              ┌───────────────────────────────┴──────────────────────────┐
+                              │                               │                           │
+                     CinematicSceneGenerator       CartoonSceneGenerator      MotionSceneGenerator
+                     (Veo → Runway → FLUX)         (FLUX/DALL-E + Ken Burns)  (ffmpeg kinetic text)
+                              │                               │                           │
+                              └───────────────────────────────┴──────────────────────────┘
+                                                              ↓
+                                                    voiceover (ElevenLabs)
+                                                              ↓
+                                                    assemble_video (ffmpeg)
+                                                              ↓
+                                                    ass_captions (Whisper + Claude)
+                                                              ↓
+                                             output/{video_id}_{style}.mp4
+```
+
+## Entry Point
+
+```
+python main.py --style cinematic|cartoon|motion|all [options]
+```
 
 ## Repository Layout (key files)
 
 ```
+main.py                                    ← NEW: full pipeline entry point
 scripts/
+  run_spine.py                             ← text spine orchestrator
   research/
-    topic_selector.py       — SCAFFOLD: Claude Haiku topic picker
-    fact_research.py        — SCAFFOLD: Claude Sonnet fact gatherer
+    topic_selector.py                      ← v2: Claude Haiku topic picker
+    fact_research.py                       ← v1: Claude Sonnet fact gatherer
   production/
-    script_generator.py     — SCAFFOLD: Claude Sonnet script writer
-    storyboard_generator.py — SCAFFOLD: scene breakdown
-    scene_image_generator.py — SCAFFOLD: AI still image generator
-    scene_animator.py       — SCAFFOLD: Ken Burns animator
-    voiceover.py            — FUNCTIONAL: ElevenLabs TTS (voice: Lily)
-    music_mixer.py          — FUNCTIONAL: 7-category track selection
-    video_editor.py         — FUNCTIONAL: ffmpeg assembly
-    ass_captions.py         — FUNCTIONAL: 4-tier ASS captions (v3.1.1)
-    quality_check.py        — FUNCTIONAL: Claude Vision QC (v2)
-    hook_generator.py       — LEGACY: PawFactory hook gen
-    smart_clipper.py        — LEGACY: PawFactory clip selector
-    visual_sampler.py       — LEGACY: PawFactory visual grounding
+    script_generator.py                    ← v2: Claude Sonnet script writer
+    storyboard_generator.py                ← v1: scene breakdown
+    scene_generators/                      ← NEW package
+      __init__.py                          ← factory: get_generator(style)
+      base.py                              ← SceneGenerator ABC
+      cinematic.py                         ← Veo + Runway + FLUX fallback
+      cartoon.py                           ← FLUX/DALL-E + Ken Burns
+      motion.py                            ← pure ffmpeg kinetic typography
+    scene_image_generator.py               ← fal.ai / OpenAI image gen
+    scene_animator.py                      ← Ken Burns animator (ffmpeg)
+    assemble_video.py                      ← concat + voice + music
+    ass_captions.py                        ← Whisper + Claude + ASS burn
+    voiceover.py                           ← ElevenLabs TTS (voice Lily)
+    music_mixer.py                         ← 7-category track selection
+    quality_check.py                       ← Claude Vision QC (v2)
   publishing/
-    metadata_gen.py         — FUNCTIONAL: YouTube metadata
-    publish_queue.py        — FUNCTIONAL: review queue
-    youtube_uploader.py     — FUNCTIONAL: YouTube Data API v3 (needs OAuth2)
-    tiktok_publisher.py     — FUNCTIONAL: TikTok API (app review pending)
-  sourcing/
-    reddit_scraper.py       — LEGACY: PawFactory scraper (not FactsFactory core)
-    downloader.py           — LEGACY: PawFactory downloader
-  run_pipeline.py           — LEGACY: PawFactory orchestrator
-
-logs/                       — gitignored
-inbox/                      — gitignored
-output/                     — gitignored
-assets/music/               — catalog.json + category folders (mp3s gitignored)
-assets/fonts/               — Anton-Regular.ttf
-docs/                       — full documentation
-shorts/log.md               — permanent record of all produced content
+    metadata_gen.py                        ← YouTube metadata gen
+    publish_queue.py                       ← review queue
+    youtube_uploader.py                    ← YouTube Data API v3 (needs OAuth2)
 ```
 
----
-
-## Key Configuration (from .env — never read aloud)
+## Key Configuration
 
 | Variable | Purpose |
 |---|---|
 | `ANTHROPIC_API_KEY` | Claude API — script gen, QC, captions |
 | `ELEVENLABS_API_KEY` | ElevenLabs TTS |
 | `ELEVENLABS_VOICE_ID` | Currently: `pFZP5JQG7iQjIQuC4Bku` (Lily) |
-| `SUBMAGIC_API_KEY` | Submagic captions (optional — ASS fallback if missing) |
-| `YOUTUBE_CLIENT_SECRETS` | Path to OAuth2 JSON from Google Cloud Console |
+| `FAL_API_KEY` | fal.ai Flux image generation |
+| `OPENAI_API_KEY` | DALL-E fallback (optional) |
+| `RUNWAY_API_KEY` | Runway Gen-3 video generation (optional — cinematic style) |
+| `GOOGLE_API_KEY` | Veo (scaffold — not yet available) |
 
----
-
-## Decisions Already Made (do not re-debate)
+## Decisions Already Made
 
 | Decision | Rationale |
 |---|---|
-| Script-first, no scraping as core path | FactsFactory pivot: AI-generated content, not scraped footage |
-| English-first | Broadest audience; no translation complexity |
-| Inherited PawFactory production modules | Already validated; don't rewrite what works |
-| Legacy sourcing modules preserved (not deleted) | May be useful for supplemental use; not worth deleting |
-| Music MP3s excluded from git | Licensed tracks (Epidemic Sound); 176MB; not safe to commit |
-| Image generation provider: TBD | Requires human approval of provider + cost model |
-| Voice: Lily (inherited) | Already validated for emotional delivery |
-
----
-
-## PawFactory Origin Notes
-
-FactsFactory was bootstrapped from PawFactory commit `ea76e33` (2026-04-02).
-PawFactory is at `/home/ai-machine/source/PawFactory` — treat as read-only reference.
-Do not modify PawFactory.
+| Script-first, no scraping | FactsFactory core pivot |
+| 3 visual styles via SceneGenerator | Extensible without touching existing code |
+| Motion style as primary test path | No image API cost — fast iteration |
+| Cinematic falls back to FLUX | Keeps pipeline working without video API keys |
+| Shared voiceover across styles | Same script → same voice → different visuals |
+| Captions shared across styles | Same ASS file reused (same audio) |

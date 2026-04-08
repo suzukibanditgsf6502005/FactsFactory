@@ -37,11 +37,15 @@ Each scene needs:
 5. A motion type (how the camera will move on the still image)
 
 Image prompt rules:
-- Write as if prompting Midjourney or DALL-E: specific, visual, descriptive
-- Include: subject, composition, lighting, color tone, style
-- Style: photorealistic unless the topic is abstract
-- Always specify: portrait orientation (9:16), no text overlay
-- Avoid: abstract concepts, charts, diagrams unless essential
+- Write as if prompting Flux or DALL-E: specific, visual, cinematic, descriptive
+- Include: subject, visual appearance, composition, lighting, color tone, style
+- CRITICAL: If the subject is a specific organism, describe how it LOOKS (color, size, shape, texture)
+  alongside its name. Never rely on a Latin name alone. Example:
+  BAD:  "Cotesia glomerata wasp laying eggs"
+  GOOD: "A tiny jet-black parasitic wasp (5mm, slender curved abdomen) piercing its ovipositor into a green caterpillar"
+- Style: photorealistic wildlife/nature photography
+- Format: portrait orientation 9:16, no text, no watermarks
+- Avoid: abstract concepts, charts, diagrams, vague descriptions
 
 Motion types:
 - slow_zoom_in: camera gradually moves closer (wonder, intensity)

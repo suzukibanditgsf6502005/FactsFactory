@@ -5,107 +5,112 @@
 
 ---
 
+## 2026-04-09 — Multi-style pipeline: cinematic / cartoon / motion + main.py
+
+**What was done:**
+- Created `scripts/production/scene_generators/` package with:
+  - `base.py` — `SceneGenerator` abstract base class (generate_scenes interface)
+  - `motion.py` — `MotionSceneGenerator`: kinetic typography via ffmpeg, no image API
+  - `cartoon.py` — `CartoonSceneGenerator`: wraps scene_image_generator + scene_animator with flat illustration prompts
+  - `cinematic.py` — `CinematicSceneGenerator`: Veo scaffold + Runway scaffold + FLUX fallback
+  - `__init__.py` — `get_generator(style)` factory function
+- Created `main.py` — full pipeline entry point:
+  - `--style cinematic|cartoon|motion|all`
+  - `--category`, `--target-duration`, `--no-music`, `--no-captions`, `--dry-run`
+  - `--style all` generates all 3 styles from one voiceover + storyboard
+  - Text spine shared across styles; voiceover generated once
+- Fixed `ass_captions.py` bug: local `import os` inside function was shadowing module-level `os`, causing `UnboundLocalError` — replaced with `Path.unlink(missing_ok=True)`
+- Tested motion generator end-to-end: 8/8 clips in ~3s, assembled, captioned OK
+- Tested `--style all --dry-run`: all 3 style routes confirmed working
+- Updated all docs: current-task.md, resume-handoff.md, status-report.md, progress-log.md
+
+**Files changed:**
+- `main.py` (new)
+- `scripts/production/scene_generators/__init__.py` (new)
+- `scripts/production/scene_generators/base.py` (new)
+- `scripts/production/scene_generators/motion.py` (new)
+- `scripts/production/scene_generators/cartoon.py` (new)
+- `scripts/production/scene_generators/cinematic.py` (new)
+- `scripts/production/ass_captions.py` (bug fix)
+- `docs/current-task.md`, `docs/resume-handoff.md`, `docs/status-report.md`, `docs/progress-log.md`
+
+**Next step:** Run real validation batch: `python main.py --style motion --category animal_facts`
+
+---
+
+## 2026-04-03 — First short produced: wasp-test-001 (zombie wasp, 48.4s)
+
+**What was done:**
+- Ran end-to-end: topic → research → script → storyboard → images → animate → assemble → captions
+- Images: 8 scenes via fal.ai Flux (576×1024 JPEG, 81–137KB each)
+- Animator: Ken Burns via ffmpeg zoompan — pan_right bug fixed (changed `t` → `on`, hardcoded 0.04762 constant)
+- Assembly: 8 clips concatenated + ElevenLabs voiceover (48.43s)
+- Captions: Whisper transcription + Claude Haiku analysis + ASS burn
+- Output: output/wasp-test-001_captioned.mp4 (4MB, 48.4s, 1080×1920)
+- Fixed ass_captions.py CLI to burn via temp file → prevents same-file input/output error
+
+**Files changed:**
+- scripts/production/scene_animator.py (pan_right/pan_left formula fix)
+- scripts/production/ass_captions.py (temp-file burn fix)
+- scripts/production/assemble_video.py (new)
+
+**Next step:** Multi-style pipeline refactor
+
+---
+
+## 2026-04-03 — Env audit + scene_image_generator + scene_animator implemented
+
+**What was done:**
+- Audited .env and .env.example; normalized both for FactsFactory stack
+- Implemented scene_image_generator.py (fal.ai Flux primary, DALL-E fallback)
+- Improved storyboard image prompts (organism visual descriptions, CRITICAL note added)
+- Implemented scene_animator.py (Ken Burns via ffmpeg zoompan)
+- Generated first 8 test images (wasp-test-001) via fal.ai
+- Generated voiceover via ElevenLabs (48.43s, voice Lily)
+
+**Files changed:**
+- scripts/production/scene_image_generator.py (scaffold → v1)
+- scripts/production/scene_animator.py (scaffold → v1)
+- scripts/production/storyboard_generator.py (prompt improvement)
+- .env.example (rewritten for FactsFactory)
+
+---
+
 ## 2026-04-03 — Text spine validation pass: 10 runs, critical issues fixed
 
 **What was done:**
-- Copied .env from PawFactory; confirmed ANTHROPIC_API_KEY present
-- Added `weird_biology` to CATEGORIES in topic_selector.py, run_spine.py, script_generator.py
-- Ran 6 pre-fix batches (animal_facts × 5, weird_biology × 1) — identified critical issues
-- Identified and fixed 3 issues:
-  1. Topic diversity: selector was deterministic → always octopus (fixed: random top-3 pick)
-  2. Category context: weird_biology produced animal_facts topics (fixed: CATEGORY_DESCRIPTIONS)
-  3. Word count drift: 107–125w vs 96w target (fixed: HARD LIMIT instruction + max_words)
-- Ran 4 post-fix validation runs (animal_facts × 2, weird_biology × 2)
-- Post-fix quality: 3 distinct topics, 95–110 words, Shorts-native hooks, strong scripts
-- Remaining minor issues documented: repeated closing phrase, storyboard duration gap, image prompt specificity
+- Ran 10 validation runs across animal_facts + weird_biology
+- Fixed 3 critical issues: topic diversity, category context, word count drift
 - Wrote validation summary: logs/validation/spine_validation_20260403.md
-- Updated docs: current-task, resume-handoff, progress-log, status-report
 
 **Files changed:**
-- scripts/research/topic_selector.py (v1 → v2): category descriptions + random top-3
-- scripts/production/script_generator.py (v1 → v2): hard word count limit + cleaner prompt
-- scripts/run_spine.py: weird_biology added to CATEGORIES
-- docs/current-task.md, docs/resume-handoff.md, docs/progress-log.md, docs/status-report.md
-- logs/validation/spine_validation_20260403.md (new)
-
-**Next step:** Human decides image generation provider; implement scene_image_generator.py
+- scripts/research/topic_selector.py (v1 → v2)
+- scripts/production/script_generator.py (v1 → v2)
+- scripts/run_spine.py (weird_biology added)
+- docs/*
 
 ---
 
 ## 2026-04-03 — Text spine implemented: topic → research → script → storyboard
 
 **What was done:**
-- Implemented `scripts/research/topic_selector.py` (v1)
-  - Model: claude-haiku-4-5-20251001
-  - Generates 5 scored candidates, returns top pick
-  - Output: logs/topics/TIMESTAMP_category.json
-- Implemented `scripts/research/fact_research.py` (v1)
-  - Model: claude-sonnet-4-6
-  - 8–10 facts ordered by impact, strict JSON with validation
-  - Output: logs/research/TIMESTAMP_slug.json
-- Implemented `scripts/production/script_generator.py` (v1)
-  - Model: claude-sonnet-4-6
-  - hook + narration + CTA + 4 title_variants + emotional_angle
-  - Word count recomputed from actual full_script for accuracy
-  - Output: logs/scripts/TIMESTAMP_slug.json
-- Implemented `scripts/production/storyboard_generator.py` (v1)
-  - Model: claude-haiku-4-5-20251001
-  - 7–9 scenes: scene_goal, narration_segment, visual_description, image_prompt, motion
-  - Scene durations validated + auto-corrected
-  - Output: logs/storyboards/TIMESTAMP_slug.json
-- Created `scripts/run_spine.py` — orchestrator for the full chain
-  - --dry-run: no files written, all output to stdout
-  - --topic-file / --research-file / --script-file: resume from any stage
-  - --target-duration: controls script length
-- Created venv at FactsFactory/venv, installed anthropic + python-dotenv
-- All CLIs verified with --help
-- Updated docs: current-task, resume-handoff, progress-log
+- Implemented all 4 text spine modules from scaffold
+- Created run_spine.py orchestrator with --dry-run and resume flags
+- Verified end-to-end with live API calls
 
 **Files changed:**
-- scripts/research/topic_selector.py (scaffold → v1)
-- scripts/research/fact_research.py (scaffold → v1)
-- scripts/production/script_generator.py (scaffold → v1)
-- scripts/production/storyboard_generator.py (scaffold → v1)
+- scripts/research/topic_selector.py, fact_research.py (scaffold → v1)
+- scripts/production/script_generator.py, storyboard_generator.py (scaffold → v1)
 - scripts/run_spine.py (new)
-- docs/current-task.md, docs/resume-handoff.md, docs/progress-log.md
-
-**Blocker:** .env not copied to FactsFactory — live API test not yet run.
-
-**Next step:** Copy .env, run `python scripts/run_spine.py --category animal_facts --dry-run`
 
 ---
 
 ## 2026-04-03 — Bootstrap: FactsFactory created from PawFactory
 
 **What was done:**
-- Created FactsFactory at `/home/ai-machine/source/FactsFactory`
-- rsync from PawFactory (local, commit ea76e33) with exclusions:
-  `.git`, `.env`, `venv/`, `inbox/`, `output/`, `logs/`, `__pycache__/`, `.pytest_cache/`,
-  `.mypy_cache/`, `.ruff_cache/`, `.idea/`, `.vscode/`, `.claude/`, all music MP3s
-- Assets preserved: `assets/music/catalog.json`, `assets/fonts/Anton-Regular.ttf`
-- All scripts preserved: production, publishing, sourcing (legacy), tools
-- `.gitignore` updated: added pytest/mypy/ruff caches, music MP3s
-- README.md rewritten for FactsFactory: script-first, AI visuals, facts niche
-- CLAUDE.md rewritten for FactsFactory: new pipeline flow, legacy module labeling
-- docs/current-task.md: reset to FactsFactory bootstrap state
-- docs/resume-handoff.md: full FactsFactory handoff document
-- docs/progress-log.md: this file (created fresh)
-- docs/status-report.md: reset for FactsFactory
-- Scaffold modules created:
-  - `scripts/research/topic_selector.py`
-  - `scripts/research/fact_research.py`
-  - `scripts/production/script_generator.py`
-  - `scripts/production/storyboard_generator.py`
-  - `scripts/production/scene_image_generator.py`
-  - `scripts/production/scene_animator.py`
-- Git initialized, initial commit pushed to GitHub
+- rsync from PawFactory, excluding .git/.env/venv/inbox/output/logs/music MP3s
+- Rewrote README.md and CLAUDE.md for FactsFactory
+- Created scaffold modules for research + production pipeline
+- Git initialized, pushed to GitHub
 
-**Files modified:**
-- README.md, CLAUDE.md, .gitignore
-- docs/current-task.md, docs/resume-handoff.md, docs/progress-log.md, docs/status-report.md
-- scripts/research/ (new directory + 2 scaffold files)
-- scripts/production/script_generator.py, storyboard_generator.py, scene_image_generator.py, scene_animator.py (new scaffolds)
-
-**What worked:** rsync clean copy, git init, GitHub repo creation via API
-
-**Next step:** Implement topic_selector.py → fact_research.py → script_generator.py
+**Files changed:** Full repository bootstrap

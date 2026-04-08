@@ -1,295 +1,145 @@
 # Tools & APIs
 
-> Wszystkie narzędzia używane przez PawFactory. Dla każdego: jak uzyskać klucz, limity, koszt, jak testować.
+> All external services used by FactsFactory — keys, costs, how to test.
+> Last updated: 2026-04-09
 
 ---
 
-## 1. Anthropic API (Claude)
+## Anthropic (Claude)
 
-**Do czego:** Generowanie hooków, skryptów narracji, tytułów, opisów, research niszy.
+**Used for:** Topic selection, fact research, script generation, storyboard, caption analysis, QC.
 
-**Jak uzyskać klucz:**
-1. Wejdź na [console.anthropic.com](https://console.anthropic.com)
-2. Zarejestruj konto
-3. Settings → API Keys → Create Key
-4. Skopiuj do `.env` jako `ANTHROPIC_API_KEY`
+**Get key:** [console.anthropic.com](https://console.anthropic.com) → API Keys → Create Key
 
 **Models in use:**
-- `claude-sonnet-4-6` — hook generation, QC
-- `claude-haiku-4-5-20251001` — music track selection, caption keyword analysis
 
-**Koszt:** ~$0.003 per hook (input + output ~1500 tokenów)
-- Przy 2 shortach/dzień = ~$0.18/mies — pomijalne
-
-**Limity:** Rate limit na nowym koncie: 50 req/min — wystarczy z zapasem
+| Model | Used in | Approx cost/short |
+|---|---|---|
+| `claude-haiku-4-5-20251001` | topic_selector, storyboard_generator, ass_captions | ~$0.0005 |
+| `claude-sonnet-4-6` | fact_research, script_generator, quality_check | ~$0.005 |
 
 **Test:**
 ```bash
-python -c "
-import anthropic, os
-from dotenv import load_dotenv
-load_dotenv()
-c = anthropic.Anthropic()
-r = c.messages.create(model='claude-sonnet-4-5', max_tokens=100, messages=[{'role':'user','content':'Say OK'}])
-print(r.content[0].text)
-"
+source venv/bin/activate
+python -c "import anthropic; c = anthropic.Anthropic(); print(c.models.list())"
 ```
+
+**.env key:** `ANTHROPIC_API_KEY`
 
 ---
 
-## 2. ElevenLabs (AI Voiceover)
+## ElevenLabs
 
-**Do czego:** Generowanie lektora AI dla każdego Shorta.
+**Used for:** TTS voiceover — voice Lily (`pFZP5JQG7iQjIQuC4Bku`), model `eleven_multilingual_v2`.
 
-**Jak uzyskać klucz:**
-1. Wejdź na [elevenlabs.io](https://elevenlabs.io)
-2. Zarejestruj konto → wybierz plan **Starter ($5/mies)**
-3. Profile → API Key → skopiuj
-4. Do `.env` jako `ELEVENLABS_API_KEY`
+**Get key:** [elevenlabs.io](https://elevenlabs.io) → Profile → API Key
 
-**Current voice:** Lily (`pFZP5JQG7iQjIQuC4Bku`) — Velvety Actress, British, confident. Set as `ELEVENLABS_VOICE_ID` in `.env`.
-
-**Previously tested:** Rachel (`21m00Tcm4TlvDq8ikWAM`) — replaced by Lily for more dramatic delivery.
-
-**Koszt:** Plan Starter = $5/mies = 30 min audio
-- 1 Short ≈ 40 sekund narracji
-- 30 min = ~45 shortów/mies — wystarczy na początku
-- Plan Creator ($22/mies) = 100 min gdy skalujesz
-
-**Limity:** 20 req/min na Starterze
+**Cost:** ~$0.0003/character → ~$0.03/short (100-word script ≈ 600 chars)
 
 **Test:**
 ```bash
+source venv/bin/activate
 python scripts/production/voiceover.py --test
 ```
 
+**.env keys:** `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`
+
 ---
 
-## 3. Reddit Sourcing — RSS (no API key required)
+## fal.ai (Flux)
 
-> **PRAW (Reddit API) was replaced by RSS in March 2026.**
-> The old PRAW integration required app registration and was subject to policy restrictions.
-> Current implementation uses public RSS feeds via `feedparser` + `requests` — no credentials needed.
+**Used for:** AI image generation — Flux Dev model, portrait_16_9 (576×1024).
 
-**Script:** `scripts/sourcing/reddit_scraper.py`
+**Get key:** [fal.ai](https://fal.ai) → Dashboard → API Keys
 
-**Active feeds (hot.rss):**
-- r/AnimalsBeingBros, r/MadeMeSmile, r/HumansBeingBros, r/aww, r/rarepuppers, r/Eyebleach, r/rescue
-
-**No `.env` keys needed for Reddit.** Remove `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT` if present — they are unused.
+**Cost:** ~$0.003–0.008/image → ~$0.024–0.064/short (8 images)
 
 **Test:**
 ```bash
-python scripts/sourcing/reddit_scraper.py --test
+source venv/bin/activate
+python scripts/production/scene_image_generator.py \
+  --storyboard logs/storyboards/LATEST.json --dry-run
 ```
 
-**Note:** `r/rescue` returns 403 consistently — may be removed from `RSS_FEEDS` in the scraper.
+**.env key:** `FAL_API_KEY`
 
 ---
 
-## 4. yt-dlp (Video Downloader)
+## OpenAI (DALL-E 3)
 
-**Do czego:** Pobieranie filmów z Reddit, TikTok, Instagram, YouTube, 1000+ serwisów.
+**Used for:** Fallback image generation if fal.ai fails.
 
-**Instalacja:**
+**Get key:** [platform.openai.com](https://platform.openai.com) → API Keys
+
+**Cost:** ~$0.040/image (standard) — much more expensive than fal.ai; avoid as primary.
+
+**.env key:** `OPENAI_API_KEY`
+
+---
+
+## Runway ML (cinematic style)
+
+**Used for:** AI video generation — Gen-3 Alpha Turbo, text-to-video.
+
+**Get key:** [runwayml.com](https://runwayml.com) → API Access
+
+**Cost:** ~$0.05/second of video → ~$0.15–0.30/scene (5–10s clips)
+
+**Install:** `pip install runwayml`
+
+**Status:** Scaffold implemented in `scene_generators/cinematic.py` — ready when key is added.
+
+**.env key:** `RUNWAY_API_KEY`
+
+---
+
+## Google Veo
+
+**Used for:** Cinematic video generation (higher quality than Runway).
+
+**Status:** Scaffold only — Veo API is in private preview as of 2026-04. Not yet publicly available.
+
+**.env key:** `GOOGLE_API_KEY` (or `VERTEX_PROJECT_ID` + `VERTEX_LOCATION`)
+
+---
+
+## YouTube Data API v3
+
+**Used for:** Uploading finished shorts + scheduling.
+
+**Get credentials:**
+1. [console.cloud.google.com](https://console.cloud.google.com) → Create project
+2. Enable YouTube Data API v3
+3. OAuth 2.0 credentials → Desktop app
+4. Download JSON → set path in `.env`
+
+**Authenticate:**
 ```bash
-# Ubuntu
-sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
-  -o /usr/local/bin/yt-dlp
-sudo chmod a+rx /usr/local/bin/yt-dlp
-
-# Aktualizacja (rób co tydzień — serwisy często zmieniają API)
-yt-dlp -U
+python scripts/publishing/youtube_uploader.py --auth
 ```
 
-**Koszt:** Darmowy, open source
-
-**Konfiguracja w `.env`:** Nie wymaga klucza API
-
-**Użycie w skryptach:**
-```bash
-# Pobierz najlepszą jakość do 1080p
-yt-dlp -f "bestvideo[height<=1080]+bestaudio/best[height<=1080]" \
-  --merge-output-format mp4 \
-  --output "inbox/%(id)s.%(ext)s" \
-  "URL"
-```
-
-**Test:**
-```bash
-yt-dlp --version
-yt-dlp -f best --output "inbox/test.%(ext)s" "https://www.reddit.com/r/AnimalsBeingBros/comments/JAKIS_POST/"
-```
+**.env keys:** `YOUTUBE_CLIENT_SECRETS` (path to JSON), `YOUTUBE_TOKEN` (auto-generated after auth)
 
 ---
 
-## 5. ffmpeg (Video Processing)
+## Whisper (local)
 
-**Do czego:** Konwersja do 9:16, dodawanie audio, nakładanie napisów, encoding.
+**Used for:** Voiceover transcription for caption word timestamps.
 
-**Instalacja:**
-```bash
-sudo apt install -y ffmpeg
-```
+**Install:** `pip install openai-whisper` (already in venv)
 
-**Koszt:** Darmowy, open source
+**Model used:** `small` — good speed/accuracy balance on CPU.
 
-**Kluczowe komendy używane w pipeline:**
-
-```bash
-# Konwersja do 9:16 + resize do 1080x1920
-ffmpeg -i input.mp4 \
-  -vf "crop=ih*9/16:ih,scale=1080:1920,setsar=1" \
-  -c:v libx264 -preset fast -crf 22 \
-  output_vertical.mp4
-
-# Podmiana audio (voiceover 100% + oryginał 15%)
-ffmpeg -i video.mp4 -i voiceover.mp3 \
-  -filter_complex "[0:a]volume=0.15[orig];[1:a]volume=1.0[vo];[orig][vo]amix=inputs=2[a]" \
-  -map 0:v -map "[a]" -c:v copy -c:a aac \
-  output_mixed.mp4
-
-# Burn-in napisów z pliku SRT
-ffmpeg -i video.mp4 \
-  -vf "subtitles=captions.srt:force_style='FontSize=18,Bold=1,Alignment=2,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,BorderStyle=1,Outline=2'" \
-  output_captioned.mp4
-```
-
-**Test:**
-```bash
-ffmpeg -version
-```
+**No API key needed** — runs locally.
 
 ---
 
-## 6. Whisper (Auto-captions, lokalne — darmowe)
+## ffmpeg (system)
 
-**Do czego:** Transkrypcja audio do SRT dla napisów. Alternatywa dla Captions.ai.
+**Used for:** Ken Burns animation, video concat, caption burn, audio mux.
 
-**Instalacja:**
-```bash
-pip install openai-whisper
-# Wymaga też: sudo apt install -y python3-dev
-```
+**Install:** `sudo apt install ffmpeg`
 
-**Użycie:**
-```bash
-whisper audio.mp3 --model small --output_format srt --output_dir logs/captions/
-```
+**Test:** `ffmpeg -version`
 
-**Modele:**
-- `tiny` — najszybszy, mniej dokładny (ok dla prostej narracji)
-- `small` — dobry balans (rekomendowany)
-- `medium` — dokładniejszy, wolniejszy
-
-**Koszt:** Darmowy (lokalnie), wymaga ~1-2 GB RAM per run
-
----
-
-## 7. Buffer (Multi-platform scheduling)
-
-**Do czego:** Schedulowanie postów na YouTube, TikTok, Instagram z jednego miejsca.
-
-**Jak uzyskać klucz:**
-1. Wejdź na [buffer.com](https://buffer.com)
-2. Zarejestruj konto → plan **Essentials ($6/mies)**
-3. Settings → API → Create Access Token
-4. Do `.env` jako `BUFFER_ACCESS_TOKEN`
-5. Połącz konta: YouTube, TikTok, Instagram
-
-**Koszt:** $6/mies (Essentials — 3 kanały, unlimited posts)
-
-**Limity:** API rate limit: 60 req/min
-
-**Uwaga:** Buffer obsługuje schedulowanie, ale upload wideo na TikTok przez API wymaga dodatkowej weryfikacji. Na początku TikTok wrzucaj ręcznie.
-
----
-
-## 8. YouTube Data API
-
-**Do czego:** Analytics (views, CTR, AVD), opcjonalnie upload.
-
-**Jak uzyskać klucz:**
-1. Wejdź na [console.cloud.google.com](https://console.cloud.google.com)
-2. Utwórz nowy projekt: `PawFactory`
-3. APIs & Services → Enable APIs → szukaj "YouTube Data API v3" → Enable
-4. Credentials → Create Credentials → API Key
-5. Do `.env` jako `YOUTUBE_API_KEY`
-
-**Koszt:** Darmowy (10,000 units/dzień — wystarczy)
-
-**Limity:** 10,000 quota units/dzień. Odczyt statystyk = ~1-5 units per call.
-
----
-
-## 9. Opus Clip (Smart clipping) — opcjonalny
-
-**Do czego:** Automatyczne wykrywanie najlepszych momentów z długich filmów.
-
-**Jak uzyskać klucz:**
-1. [opus.pro](https://opus.pro) → Sign up
-2. Plan **Starter ($19/mies)** — 150 min/mies
-3. Settings → API (beta) → Generate Key
-4. Do `.env` jako `OPUS_CLIP_API_KEY`
-
-**Uwaga:** API Opus Clip jest w beta — funkcjonalność może być ograniczona. Na początek można pominąć i używać yt-dlp + ffmpeg do cięcia.
-
----
-
-## 10. Submagic (Primary Caption API)
-
-**Purpose:** Word-by-word captions with highlights. Sara template. Primary caption path in `video_editor.py`.
-
-**How it works:** Video uploaded to catbox.moe (24h temp host) → POST to Submagic API → poll for completion → download captioned video.
-
-**Key setting:** `cleanAudio=False` — preserves ElevenLabs voiceover (does not replace with Submagic TTS).
-
-**Cost:** Consumes project minutes per video. Check balance at submagic.co before production runs.
-
-**Config:** `SUBMAGIC_API_KEY` in `.env`
-
-**Fallback:** If Submagic fails or key is absent, `video_editor.py` automatically uses ASS v2 captions (free, local).
-
----
-
-## 11. Captions.ai — NOT IN USE
-
-> Captions.ai is NOT used. The current fallback caption system is ASS v2 (`ass_captions.py`) using Whisper + Claude Haiku + ffmpeg. No external caption API other than Submagic is needed.
-
----
-
-## Podsumowanie — co kupić na start (PoC)
-
-| Narzędzie | Koszt | Priorytet |
-|-----------|-------|-----------|
-| Anthropic API | Pay-per-use (~$1/mies) | ✅ Konieczny |
-| ElevenLabs Starter | $5/mies | ✅ Konieczny |
-| Reddit API | Darmowy | ✅ Konieczny |
-| yt-dlp + ffmpeg | Darmowy | ✅ Konieczny |
-| Whisper | Darmowy | ✅ Konieczny |
-| Buffer Essentials | $6/mies | ⏳ Gdy masz co schedulować |
-| YouTube Data API | Darmowy | ⏳ Gdy masz kanał |
-| Opus Clip | $19/mies | ⏳ Później |
-| Captions.ai | $13/mies | ⏳ Później |
-
-**Koszt startu: ~$6–11/mies**
-
----
-
-## .env.example
-
-The canonical `.env.example` lives at the repo root. Key variables:
-
-| Variable | Required | Purpose |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | ✅ | Hook gen, QC, music select, caption analysis |
-| `ELEVENLABS_API_KEY` | ✅ | Voiceover TTS |
-| `ELEVENLABS_VOICE_ID` | ✅ | `pFZP5JQG7iQjIQuC4Bku` (Lily) |
-| `SUBMAGIC_API_KEY` | ⚡ | Primary captions; omit to use free ASS v3 fallback |
-| `OPENAI_API_KEY` | ⏳ | Optional — enables OpenAI QA provider (`--provider openai`) |
-| `YOUTUBE_API_KEY` | ⏳ | Analytics only; not needed until channel launched |
-| `INBOX_DIR` | — | Default: `./inbox` |
-| `OUTPUT_DIR` | — | Default: `./output` |
-| `LOG_DIR` | — | Default: `./logs` |
-
-**Not needed:** `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` (replaced by RSS), `CAPTIONS_AI_API_KEY` (not used), `BUFFER_ACCESS_TOKEN` (manual upload in use), `OPUS_CLIP_API_KEY` (not integrated).
+**No API key needed.**

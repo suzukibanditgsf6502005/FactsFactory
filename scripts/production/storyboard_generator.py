@@ -25,27 +25,41 @@ load_dotenv()
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
 
 MOTION_TYPES = ["static", "slow_zoom_in", "slow_zoom_out", "pan_left", "pan_right"]
+VALID_LAYOUT_HINTS = {"split", "overlay", "callout", "cross_section", "before_after", "process_flow"}
 
 SYSTEM_PROMPT = """You are a storyboard artist for a YouTube Shorts facts channel.
 You break narration scripts into visual scenes for AI image generation.
 
+Your scenes are designed for INFOGRAPHIC/COMIC-STYLE visual storytelling — dense, educational frames
+with multiple elements per scene. Think educational explainer comics, textbook diagrams, and
+illustrated fact cards — not photographs.
+
 Each scene needs:
 1. A narration segment (exact words from the script for that scene)
 2. A scene goal (what this scene must achieve for the viewer)
-3. A visual description (what should appear on screen)
-4. An image prompt (detailed, AI-generation-ready prompt for a still image)
-5. A motion type (how the camera will move on the still image)
+3. A visual description (what should appear on screen — multiple visual elements)
+4. An image prompt (detailed, infographic/comic-style AI generation prompt)
+5. Structured visual fields: main_subject, supporting_elements, layout_hint, labels_and_callouts
+6. A motion type (how the camera will move on the still image)
 
 Image prompt rules:
-- Write as if prompting Flux or DALL-E: specific, visual, cinematic, descriptive
-- Include: subject, visual appearance, composition, lighting, color tone, style
-- CRITICAL: If the subject is a specific organism, describe how it LOOKS (color, size, shape, texture)
-  alongside its name. Never rely on a Latin name alone. Example:
-  BAD:  "Cotesia glomerata wasp laying eggs"
-  GOOD: "A tiny jet-black parasitic wasp (5mm, slender curved abdomen) piercing its ovipositor into a green caterpillar"
-- Style: photorealistic wildlife/nature photography
-- Format: portrait orientation 9:16, no text, no watermarks
-- Avoid: abstract concepts, charts, diagrams, vague descriptions
+- Write as if prompting Flux or DALL-E for an educational infographic or comic panel
+- Include MULTIPLE visual elements in ONE frame — not a single subject on a blank background
+- Describe: main subject + 2–4 supporting elements + visual layout + diagram style
+- Add: arrows, callout boxes, labeled areas, cross-sections, comparison panels, process flows
+- Style: flat illustration / educational infographic / comic-book explainer, bold outlines, vibrant colors
+- Format: portrait orientation 9:16, no watermarks
+- Avoid: photorealism, wildlife photography, single-subject isolation, empty negative space
+- Short text labels in the image are OK and encouraged (keep them to 1–3 words each)
+- Every frame should look like a page from an educational comic or illustrated facts card
+
+Layout hint types:
+- split: two or more side-by-side panels (comparison, before/after)
+- overlay: smaller diagram/icon overlaid on the main subject
+- callout: labeled arrows pointing to key parts of the main subject
+- cross_section: interior cutaway view of the main subject
+- before_after: left/right contrast showing change over time
+- process_flow: step-by-step visual sequence within the frame
 
 Motion types:
 - slow_zoom_in: camera gradually moves closer (wonder, intensity)
@@ -81,8 +95,16 @@ Return ONLY valid JSON in this exact structure:
       "scene_goal": "What this scene must accomplish for the viewer (1 sentence)",
       "narration_segment": "Exact words from the script that play during this scene",
       "estimated_duration_seconds": 4.0,
-      "visual_description": "Plain English description of what appears on screen",
-      "image_prompt": "Detailed AI image generation prompt: [subject], [composition], [lighting], [color], [style], portrait orientation 9:16, photorealistic, no text",
+      "visual_description": "Multiple visual elements visible in this educational comic frame",
+      "image_prompt": "Dense infographic/comic-style educational scene: [main subject + 2-4 supporting elements], [layout type], [labels and callouts], flat illustration style, bold outlines, vibrant colors, arrows, callout boxes, labeled areas, portrait 9:16, no watermarks",
+      "main_subject": "The primary visual focus of this scene (e.g. 'mantis shrimp claw', 'brain diagram')",
+      "supporting_elements": [
+        "first supporting visual element",
+        "second supporting visual element",
+        "third supporting visual element"
+      ],
+      "layout_hint": "callout",
+      "labels_and_callouts": ["short label 1", "short label 2"],
       "motion": "slow_zoom_in"
     }}
   ]
@@ -96,7 +118,10 @@ Rules:
 - estimated_duration_seconds per scene: derived from word count of narration_segment ÷ 2.75
 - Sum of all scene durations should approximately equal total_estimated_duration_seconds
 - motion must be one of: static, slow_zoom_in, slow_zoom_out, pan_left, pan_right
-- image_prompt must be specific enough to generate without ambiguity"""
+- layout_hint must be one of: split, overlay, callout, cross_section, before_after, process_flow
+- supporting_elements must be a list of 2 to 4 strings
+- labels_and_callouts is optional — omit or set to [] if not applicable
+- image_prompt must describe a DENSE multi-element infographic/comic frame, not a single subject"""
 
 
 def _parse_json_response(raw: str) -> dict:
@@ -128,6 +153,19 @@ def _validate_scenes(scenes: list) -> None:
             raise ValueError(f"Scene {i} has invalid motion '{scene['motion']}' — must be one of {MOTION_TYPES}")
         if scene["scene_index"] != i:
             scene["scene_index"] = i  # auto-correct
+        # Validate new structured fields when present
+        if "supporting_elements" in scene:
+            se = scene["supporting_elements"]
+            if not isinstance(se, list) or not (2 <= len(se) <= 4):
+                raise ValueError(
+                    f"Scene {i} supporting_elements must be a list of 2–4 items, got: {se!r}"
+                )
+        if "layout_hint" in scene:
+            if scene["layout_hint"] not in VALID_LAYOUT_HINTS:
+                raise ValueError(
+                    f"Scene {i} has invalid layout_hint '{scene['layout_hint']}' — "
+                    f"must be one of {sorted(VALID_LAYOUT_HINTS)}"
+                )
 
 
 def generate_storyboard(script: dict) -> dict:

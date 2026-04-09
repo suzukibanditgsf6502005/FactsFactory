@@ -6,7 +6,7 @@
 
 ---
 
-## System State — 2026-04-09 (multi-style pipeline complete)
+## System State — 2026-04-09 (hybrid cinematic pipeline + cartoon infographic pivot)
 
 ### Completed
 
@@ -19,30 +19,37 @@
 | scene_animator.py | Ken Burns via ffmpeg zoompan (pan bug fixed — uses `on` variable) |
 | assemble_video.py | concat + voiceover + music → final mp4 |
 | ass_captions.py | Whisper + Claude Haiku + ASS burn (temp-file fix applied) |
-| **main.py** | **NEW: Full pipeline entry point with --style routing** |
-| **scene_generators/base.py** | **NEW: SceneGenerator abstract base class** |
-| **scene_generators/motion.py** | **NEW: Kinetic typography — pure ffmpeg, no image API** |
-| **scene_generators/cartoon.py** | **NEW: fal.ai/DALL-E images + Ken Burns animation** |
-| **scene_generators/cinematic.py** | **NEW: Veo scaffold + Runway scaffold + FLUX fallback** |
+| main.py | Full pipeline entry point with --style routing |
+| scene_generators/base.py | SceneGenerator abstract base class |
+| scene_generators/motion.py | Kinetic typography — ON DISK, TEMPORARILY DISABLED from public pipeline |
+| scene_generators/cartoon.py | fal.ai/DALL-E images + Ken Burns animation |
+| scene_generators/cinematic.py | Veo scaffold + Runway scaffold + FLUX fallback |
 | First short | output/wasp-test-001_captioned.mp4 (zombie wasp, 48.4s, with captions) |
 | Motion test | output/motion-test-001_final.mp4 (kinetic typography, verified) |
+| **storyboard_generator.py v2** | **NEW: infographic/comic prompts; emits main_subject, supporting_elements, layout_hint, labels_and_callouts** |
+| **scene_image_generator.py v2** | **NEW: _build_scene_prompt() — dense infographic prompt from structured fields; backward compat fallback** |
+| **cartoon.py v2** | **NEW: uses infographic path for structured scenes; legacy suffix fallback for old storyboards** |
+| **cinematic.py v2** | **NEW: hybrid pipeline — manual Veo clips + AI fallback per scene; _load_veo_clips()** |
+| **__init__.py updated** | **NEW: motion removed from STYLES; raises RuntimeError if requested** |
+| **main.py v3** | **NEW: --video-id flag; motion removed from CLI; --style all = cinematic + cartoon** |
 
 ### In Progress
 
-Nothing. Ready for validation batch.
+Nothing. Hybrid cinematic + infographic cartoon pivot both complete.
 
 ### What Remains (ordered priority)
 
-1. **Run 2–3 motion shorts** — `python main.py --style motion --category animal_facts`
-2. **Run 1–2 cartoon shorts** — `python main.py --style cartoon --category weird_biology`
-3. **Evaluate and document quality** — logs/validation/
+1. **Run cartoon validation batch** — `python main.py --style cartoon --category weird_biology`
+2. **Evaluate infographic prompt quality** — compare dense multi-element frames vs. old single-subject
+3. **Test hybrid cinematic** — place Veo clips in `inbox/<video_id>_cinematic/veo/`, re-run with `--video-id`
 4. **YouTube OAuth2 setup** — `python scripts/publishing/youtube_uploader.py --auth`
-5. **Runway API wiring** — add RUNWAY_API_KEY to .env for true cinematic style
-6. **Veo integration** — when Google opens Veo API publicly
+5. **Runway API wiring** — add RUNWAY_API_KEY to .env for automatic Runway cinematic generation
+6. **Veo API integration** — when Google opens Veo API publicly
+7. **Re-enable motion** — when ready to return to public pipeline
 
 ### Blockers
 
-None. All 3 styles functional (cinematic falls back to FLUX if no video API keys).
+None. Cinematic falls back to FLUX. Cartoon uses infographic path. Veo ingest is manual + optional.
 
 ---
 
@@ -52,14 +59,33 @@ None. All 3 styles functional (cinematic falls back to FLUX if no video API keys
 cd /home/ai-machine/source/FactsFactory
 source venv/bin/activate
 
-# Run a motion short (fast, no image API cost)
-python main.py --style motion --category animal_facts
-
-# Run a cartoon short
+# Run a cartoon short — new infographic/comic prompts
 python main.py --style cartoon --category weird_biology
 
-# Run all 3 styles from same script
-python main.py --style all --category science
+# Run cinematic with FLUX fallback (note the video_id in output)
+python main.py --style cinematic --script-file logs/scripts/TIMESTAMP_topic.json
+# Note the base video_id printed at startup: e.g. 20260409_mantis-shrimp
+
+# Place manual Veo clips (external generation):
+#   inbox/20260409_mantis-shrimp_cinematic/veo/scene_000.mp4
+#   inbox/20260409_mantis-shrimp_cinematic/veo/scene_002.mp4
+
+# Re-run with --video-id to pick up Veo clips + fill rest with FLUX fallback
+python main.py --style cinematic --script-file logs/scripts/TIMESTAMP_topic.json \
+  --video-id 20260409_mantis-shrimp
+```
+
+## Manual Veo Ingest — Folder Convention
+
+```
+inbox/
+  <video_id>_cinematic/
+    veo/
+      scene_000.mp4     ← manually generated Veo clip for scene 0
+      scene_002.mp4     ← scene 2 (scene 1 will use fallback)
+      manifest.json     ← optional: [{"scene_index": 0, "filename": "scene_000.mp4"}, ...]
+    animated/           ← pipeline writes all clips here (Veo + fallback merged)
+    scenes/             ← FLUX still images (fallback scenes only)
 ```
 
 ---
@@ -67,14 +93,15 @@ python main.py --style all --category science
 ## Pipeline Architecture
 
 ```
-topic_selector → fact_research → script_generator → storyboard_generator
+topic_selector → fact_research → script_generator → storyboard_generator (v2: infographic fields)
                                                               ↓
-                              ┌───────────────────────────────┴──────────────────────────┐
-                              │                               │                           │
-                     CinematicSceneGenerator       CartoonSceneGenerator      MotionSceneGenerator
-                     (Veo → Runway → FLUX)         (FLUX/DALL-E + Ken Burns)  (ffmpeg kinetic text)
-                              │                               │                           │
-                              └───────────────────────────────┴──────────────────────────┘
+                              ┌───────────────────────────────┴──────────────────┐
+                              │                               │                   │
+                     CinematicSceneGenerator       CartoonSceneGenerator      [motion — DISABLED]
+                     (Veo → Runway → FLUX)         infographic/comic prompts
+                     photorealistic path           + Ken Burns animation
+                              │                               │
+                              └───────────────────────────────┘
                                                               ↓
                                                     voiceover (ElevenLabs)
                                                               ↓
@@ -88,7 +115,8 @@ topic_selector → fact_research → script_generator → storyboard_generator
 ## Entry Point
 
 ```
-python main.py --style cinematic|cartoon|motion|all [options]
+python main.py --style cinematic|cartoon|all [options]
+# Note: motion is temporarily disabled
 ```
 
 ## Repository Layout (key files)

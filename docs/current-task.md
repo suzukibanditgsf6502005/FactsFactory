@@ -8,15 +8,15 @@
 
 ## Current Objective
 
-**Phase:** Multi-style pipeline implemented — cinematic / cartoon / motion styles routing through `main.py`.
+**Phase:** Hybrid cinematic pipeline implemented — manual Veo clips can be placed in `inbox/<video_id>_cinematic/veo/` and are automatically used in place of fallback generation. `--video-id` CLI flag added for ID reuse across runs.
 
-**Immediate goal:** Run a real 3-short validation batch using `main.py --style motion` (no image API cost) and `--style cartoon` (fal.ai).
+**Immediate goal:** Run a cartoon validation batch (`--style cartoon`) to evaluate infographic prompt quality, then test hybrid cinematic by placing 2–3 Veo clips and re-running with `--video-id`.
 
 ---
 
 ## What Is Being Worked On RIGHT NOW
 
-Nothing active. Multi-style refactor complete.
+Nothing active. Hybrid cinematic pipeline + infographic cartoon pivot both complete.
 
 ---
 
@@ -27,13 +27,13 @@ Nothing active. Multi-style refactor complete.
 | topic_selector.py | v2 | ✅ validated |
 | fact_research.py | v1 | ✅ validated |
 | script_generator.py | v2 | ✅ validated |
-| storyboard_generator.py | v1 | ✅ validated |
-| scene_generators/base.py | v1 | ✅ new — abstract base |
-| scene_generators/motion.py | v1 | ✅ new — kinetic typography, no API |
-| scene_generators/cartoon.py | v1 | ✅ new — fal.ai/DALL-E + Ken Burns |
-| scene_generators/cinematic.py | v1 | ✅ new — Veo scaffold + Runway scaffold + FLUX fallback |
-| main.py | v1 | ✅ new — full pipeline entry, --style all |
-| scene_image_generator.py | v1 | ✅ functional (used by cartoon + cinematic fallback) |
+| storyboard_generator.py | v2 | ✅ updated — infographic/comic prompts + structured fields |
+| scene_generators/base.py | v1 | ✅ abstract base |
+| scene_generators/motion.py | v1 | ⚠️ DISABLED — on disk, unreachable from pipeline |
+| scene_generators/cartoon.py | v2 | ✅ updated — uses infographic path; legacy fallback for old storyboards |
+| scene_generators/cinematic.py | v2 | ✅ updated — hybrid: manual Veo clips + AI fallback |
+| main.py | v3 | ✅ updated — `--video-id` flag; motion removed from CLI |
+| scene_image_generator.py | v2 | ✅ updated — _build_scene_prompt() replaces global suffix |
 | scene_animator.py | v1 | ✅ functional (pan bug fixed) |
 | assemble_video.py | v1 | ✅ functional |
 | ass_captions.py | v3+ | ✅ functional (temp-file burn fix applied) |
@@ -57,9 +57,10 @@ Nothing active. Multi-style refactor complete.
 
 ## Next Steps (in order)
 
-1. **Run motion batch** — 2–3 shorts via `python main.py --style motion --category animal_facts`
-2. **Run cartoon batch** — 1–2 shorts via `python main.py --style cartoon --category weird_biology`
-3. **Evaluate quality** — inspect outputs, note remaining weaknesses
+1. **Run cartoon batch** — `python main.py --style cartoon --category weird_biology`
+2. **Evaluate infographic prompt quality** — inspect outputs vs. old single-subject frames
+3. **Test hybrid cinematic** — place 2–3 Veo clips in `inbox/<video_id>_cinematic/veo/`, re-run with `--video-id`
 4. **YouTube OAuth2 setup** — `python scripts/publishing/youtube_uploader.py --auth`
-5. **Wire Runway API** — add RUNWAY_API_KEY to .env when ready to use cinematic style properly
+5. **Wire Runway API** — add RUNWAY_API_KEY to .env for automatic Runway cinematic generation
 6. **Wire Veo API** — when Google makes Veo publicly available via API
+7. **Re-enable motion** — when motion style is ready to return to public pipeline

@@ -5,6 +5,54 @@
 
 ---
 
+## 2026-04-09 — Hybrid cinematic pipeline: manual Veo ingest + per-scene fallback
+
+**What was done:**
+- **cinematic.py v2**: Added `_load_veo_clips(video_id, scenes)` — checks `inbox/<video_id>/veo/` for manually placed scene clips. Supports `manifest.json` (explicit mapping) or filename inference (`scene_000.mp4`, etc.). Returns empty dict if folder absent (full backward compat). Rewrote `generate_scenes` with 3-step hybrid flow: (1) detect Veo clips and copy to `animated/`, (2) generate fallback only for missing scenes using existing Runway/Veo/FLUX chain, (3) collect all clips from `animated/` in scene order. Logs: "Found Veo clip for scene N", "Using fallback for scene N", "Total Veo scenes: N", "Total fallback scenes: M". When Veo clips exist, `voice_duration` scaling is skipped for fallback (prevents distributing full voice duration across only fallback scenes).
+- **main.py v3**: Added `--video-id` CLI flag. When provided, used as `base_video_id` directly instead of auto-generating. Style suffix appended as normal (`--video-id 20260409_mantis-shrimp` → cinematic video_id `20260409_mantis-shrimp_cinematic`). Updated module docstring with full manual Veo ingest workflow. Updated `run()` signature with `video_id=None` param.
+- Updated all 4 docs with Veo folder convention, hybrid pipeline description, and updated next steps.
+
+**Files changed:**
+- `scripts/production/scene_generators/cinematic.py` (v1 → v2)
+- `main.py` (v2 → v3)
+- `docs/current-task.md`, `docs/resume-handoff.md`, `docs/status-report.md`, `docs/progress-log.md`
+
+**Veo folder convention:**
+```
+inbox/<video_id>_cinematic/veo/
+  scene_000.mp4        ← manual Veo clip for scene 0
+  scene_002.mp4        ← manual Veo clip for scene 2
+  manifest.json        ← optional: [{"scene_index": 0, "filename": "scene_000.mp4"}]
+```
+
+**Next step:** `python main.py --style cartoon --category weird_biology` — cartoon infographic validation
+
+---
+
+## 2026-04-09 — Cartoon infographic/comic pivot + motion disabled
+
+**What was done:**
+- **storyboard_generator.py v2**: Rewrote SYSTEM_PROMPT and USER_PROMPT_TEMPLATE for infographic/comic-style visual storytelling. Scenes now emit 4 new structured fields: `main_subject` (string), `supporting_elements` (list 2–4), `layout_hint` (one of 6 allowed values), `labels_and_callouts` (optional list). Removed photorealism/wildlife instructions. Updated `_validate_scenes` to validate the new fields. Added `VALID_LAYOUT_HINTS` constant.
+- **scene_image_generator.py v2**: Removed global `PROMPT_SUFFIX`. Added `_build_scene_prompt(scene)` — builds a dense infographic/comic prompt from structured fields when present; falls back to `scene["image_prompt"]` for older storyboard files (backward compat). Updated `generate_scene_images` to call `_build_scene_prompt` per scene. Removed `+ PROMPT_SUFFIX` from `_generate_fal` and `_generate_openai`.
+- **cartoon.py v2**: Replaced `_patch_prompts` + flat suffix approach with `_apply_cartoon_style`. Scenes WITH structured fields are passed through — `_build_scene_prompt` handles them. Scenes WITHOUT structured fields get legacy cartoon suffix on `image_prompt` for backward compat. Ken Burns animation unchanged.
+- **cinematic.py**: Updated `_patch_scene_for_cinematic` to also clear the 4 new structured fields after patching `image_prompt`, so `generate_scene_images` uses the cinematic photorealistic path rather than the infographic/comic path.
+- **scene_generators/__init__.py**: Removed `MotionSceneGenerator` import. `STYLES = ["cinematic", "cartoon"]`. `get_generator("motion")` now raises `RuntimeError` with clear message instead of importing.
+- **main.py v2**: Removed motion from module docstring, usage examples, and argparse epilog. `--style all` now means cinematic + cartoon. Help text updated.
+- Updated all 4 docs: current-task.md, resume-handoff.md, status-report.md, progress-log.md.
+
+**Files changed:**
+- `scripts/production/storyboard_generator.py` (v1 → v2)
+- `scripts/production/scene_image_generator.py` (v1 → v2)
+- `scripts/production/scene_generators/cartoon.py` (v1 → v2)
+- `scripts/production/scene_generators/cinematic.py` (patch)
+- `scripts/production/scene_generators/__init__.py` (v1 → v2)
+- `main.py` (v1 → v2)
+- `docs/current-task.md`, `docs/resume-handoff.md`, `docs/status-report.md`, `docs/progress-log.md`
+
+**Next step:** `python main.py --style cartoon --category weird_biology` — validate infographic prompt quality
+
+---
+
 ## 2026-04-09 — Multi-style pipeline: cinematic / cartoon / motion + main.py
 
 **What was done:**

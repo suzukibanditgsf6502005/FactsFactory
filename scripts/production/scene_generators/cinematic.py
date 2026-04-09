@@ -5,15 +5,25 @@ cinematic.py — CinematicSceneGenerator
 Generates high-quality video scenes via AI video generation APIs.
 
 Priority order:
-  1. Veo (Google DeepMind) — via Vertex AI / Gemini API  [scaffold — API in preview]
+  1. Manual Veo clips  — placed by operator in inbox/<video_id>/veo/
   2. Runway Gen-3 Alpha — via Runway ML API               [scaffold — requires RUNWAY_API_KEY]
-  3. Fallback: FLUX still images + Ken Burns animation    [always works — uses fal.ai]
+  3. Veo API scaffold  — via Vertex AI / Gemini API       [scaffold — API in preview]
+  4. Fallback: FLUX still images + Ken Burns animation    [always works — uses fal.ai]
+
+Manual Veo workflow:
+  1. Run the pipeline once to generate the storyboard.
+  2. Generate clips externally (Veo, Runway, etc.) for any scenes.
+  3. Place them as: inbox/<video_id>/veo/scene_000.mp4, scene_001.mp4, ...
+     Optionally add manifest.json: [{"scene_index": 0, "filename": "scene_000.mp4"}, ...]
+  4. Re-run the pipeline. Present clips are used directly; missing scenes use fallback.
 
 Set RUNWAY_API_KEY in .env to enable Runway generation.
 Veo API is not yet publicly available; the scaffold is ready for when it opens.
 """
 
+import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -59,29 +69,73 @@ class CinematicSceneGenerator(SceneGenerator):
         voice_duration: float | None = None,
     ) -> list[Path]:
         """
-        Generate cinematic clips. Tries Veo → Runway → FLUX+Ken Burns.
-        Returns list of mp4 clip paths.
+        Hybrid cinematic generation: manual Veo clips + AI fallback.
+
+        For each storyboard scene:
+          1. If a manual clip exists in inbox/<video_id>/veo/ — use it directly.
+          2. Otherwise — generate via Runway → Veo API scaffold → FLUX + Ken Burns.
+
+        Returns an ordered list of mp4 clip paths (one per scene).
         """
         scenes = storyboard["scenes"]
         anim_dir = Path(f"inbox/{video_id}/animated")
         anim_dir.mkdir(parents=True, exist_ok=True)
 
-        # Determine provider
-        if self._prefer_video:
-            provider = _detect_video_provider()
-        else:
-            provider = "flux"
+        # ── Step 1: Check for manual Veo clips ───────────────────────────────
+        veo_clips = _load_veo_clips(video_id, scenes)
+        veo_indices = set(veo_clips.keys())
+        fallback_scenes = [s for s in scenes if s["scene_index"] not in veo_indices]
 
-        print(f"[cinematic] Provider: {provider}", flush=True)
-        print(f"[cinematic] Generating {len(scenes)} scenes...", flush=True)
+        print(f"[cinematic] Total Veo scenes: {len(veo_clips)}", flush=True)
+        print(f"[cinematic] Total fallback scenes: {len(fallback_scenes)}", flush=True)
 
-        if provider == "runway":
-            clips = _generate_runway(scenes, anim_dir, video_id, storyboard, voice_duration)
-        elif provider == "veo":
-            clips = _generate_veo(scenes, anim_dir, video_id, storyboard, voice_duration)
+        # Copy Veo clips into the animated dir
+        for idx in sorted(veo_indices):
+            src = veo_clips[idx]
+            dest = anim_dir / f"scene_{idx:03d}.mp4"
+            shutil.copy2(str(src), str(dest))
+            print(f"[cinematic] Found Veo clip for scene {idx}: {src.name} → {dest.name}", flush=True)
+
+        # ── Step 2: Generate fallback for remaining scenes ────────────────────
+        if fallback_scenes:
+            if self._prefer_video:
+                provider = _detect_video_provider()
+            else:
+                provider = "flux"
+
+            print(f"[cinematic] Provider: {provider}", flush=True)
+            for s in fallback_scenes:
+                print(f"[cinematic] Using fallback for scene {s['scene_index']}", flush=True)
+
+            fallback_storyboard = {
+                **storyboard,
+                "scenes": fallback_scenes,
+                "total_scenes": len(fallback_scenes),
+            }
+
+            # When mixing Veo + fallback, skip voice_duration proportional scaling
+            # for fallback clips — Veo clips have their own timing so scaling would
+            # distribute the full voice duration across only the fallback scenes.
+            fallback_voice_dur = None if veo_clips else voice_duration
+
+            if provider == "runway":
+                _generate_runway(fallback_scenes, anim_dir, video_id, fallback_storyboard, fallback_voice_dur)
+            elif provider == "veo":
+                _generate_veo(fallback_scenes, anim_dir, video_id, fallback_storyboard, fallback_voice_dur)
+            else:
+                _generate_flux_fallback(fallback_storyboard, video_id, fallback_voice_dur)
         else:
-            # Fallback: FLUX images + Ken Burns (always works)
-            clips = _generate_flux_fallback(storyboard, video_id, voice_duration)
+            print(f"[cinematic] All scenes covered by Veo clips — no fallback needed", flush=True)
+
+        # ── Step 3: Collect all clips in scene order ──────────────────────────
+        clips = []
+        for scene in scenes:
+            idx = scene["scene_index"]
+            clip = anim_dir / f"scene_{idx:03d}.mp4"
+            if clip.exists():
+                clips.append(clip)
+            else:
+                print(f"[cinematic] WARNING: no clip for scene {idx}", file=sys.stderr, flush=True)
 
         return clips
 
@@ -95,6 +149,58 @@ def _detect_video_provider() -> str:
     if os.getenv("GOOGLE_API_KEY") or os.getenv("VERTEX_PROJECT_ID"):
         return "veo"
     return "flux"
+
+
+# ── Manual Veo clip loader ────────────────────────────────────────────────────
+
+def _load_veo_clips(video_id: str, scenes: list[dict]) -> dict:
+    """
+    Check inbox/<video_id>/veo/ for manually provided scene video clips.
+
+    Returns dict mapping scene_index (int) -> Path for each found clip.
+
+    Discovery order:
+      1. manifest.json — explicit list: [{"scene_index": 0, "filename": "scene_000.mp4"}, ...]
+      2. Filename inference — looks for scene_000.mp4, scene_001.mp4, ... per scene index
+
+    Returns an empty dict if the veo/ folder does not exist.
+    """
+    veo_dir = Path(f"inbox/{video_id}/veo")
+    if not veo_dir.exists():
+        return {}
+
+    # Try manifest.json first
+    manifest_path = veo_dir / "manifest.json"
+    if manifest_path.exists():
+        try:
+            entries = json.loads(manifest_path.read_text())
+            result = {}
+            for entry in entries:
+                idx = int(entry["scene_index"])
+                filename = entry.get("filename", f"scene_{idx:03d}.mp4")
+                clip_path = veo_dir / filename
+                if clip_path.exists():
+                    result[idx] = clip_path
+                else:
+                    print(
+                        f"  [veo] manifest scene {idx}: file not found ({clip_path}) — skipping",
+                        file=sys.stderr, flush=True,
+                    )
+            return result
+        except Exception as e:
+            print(
+                f"  [veo] manifest.json error: {e} — falling back to filename inference",
+                file=sys.stderr, flush=True,
+            )
+
+    # Filename inference
+    result = {}
+    for scene in scenes:
+        idx = scene["scene_index"]
+        clip_path = veo_dir / f"scene_{idx:03d}.mp4"
+        if clip_path.exists():
+            result[idx] = clip_path
+    return result
 
 
 # ── Veo scaffold (Google DeepMind) ────────────────────────────────────────────
@@ -262,7 +368,11 @@ def _generate_flux_fallback(
 
 
 def _patch_scene_for_cinematic(scene: dict) -> None:
-    """Mutate scene image_prompt in-place to cinematic style."""
+    """Mutate scene image_prompt in-place to cinematic style.
+
+    Also clears any infographic structured fields so that scene_image_generator
+    uses the cinematic image_prompt path rather than the infographic/comic path.
+    """
     prompt = scene.get("image_prompt", "")
     # Remove generic suffixes, inject cinematic suffix
     for strip in [
@@ -270,6 +380,9 @@ def _patch_scene_for_cinematic(scene: dict) -> None:
     ]:
         prompt = prompt.replace(strip, "")
     scene["image_prompt"] = prompt.rstrip(", ") + CINEMATIC_PROMPT_SUFFIX
+    # Clear infographic structured fields — cinematic uses image_prompt directly
+    for field in ("main_subject", "supporting_elements", "layout_hint", "labels_and_callouts"):
+        scene.pop(field, None)
 
 
 # ── Utility ───────────────────────────────────────────────────────────────────

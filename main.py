@@ -6,24 +6,38 @@ Runs the full short-form video pipeline from topic to finished mp4.
 
 Styles:
   cinematic  — AI-generated video (Veo/Runway) or FLUX stills + Ken Burns
-  cartoon    — Flat illustration AI images + Ken Burns animation
-  motion     — Kinetic typography (no image generation required)
-  all        — Generate all 3 styles from the same script + voiceover
+  cartoon    — Infographic/comic AI images + Ken Burns animation  (primary style)
+  all        — Generate cinematic + cartoon from the same script + voiceover
+
+Note: motion style is temporarily disabled. Use cinematic or cartoon.
 
 Usage:
   python main.py --style cinematic
-  python main.py --style motion
   python main.py --style cartoon
   python main.py --style all
   python main.py --style cinematic --category weird_biology
-  python main.py --style motion --script-file logs/scripts/20260403_wasp.json
+  python main.py --style cartoon --script-file logs/scripts/20260403_wasp.json
   python main.py --style all --no-music --no-captions
-  python main.py --style motion --dry-run
+  python main.py --style cartoon --dry-run
+
+Manual Veo ingest (hybrid cinematic):
+  1. Run once to get the storyboard and video ID:
+       python main.py --style cinematic --script-file logs/scripts/TIMESTAMP_topic.json
+     Note the video ID printed at startup (e.g. 20260409_mantis-shrimp).
+
+  2. Generate Veo clips externally, then place them:
+       inbox/20260409_mantis-shrimp_cinematic/veo/scene_000.mp4
+       inbox/20260409_mantis-shrimp_cinematic/veo/scene_002.mp4
+
+  3. Re-run with --video-id to reuse the same ID and pick up Veo clips:
+       python main.py --style cinematic --script-file logs/scripts/TIMESTAMP_topic.json \
+         --video-id 20260409_mantis-shrimp
+
+     Result: scenes with Veo clips use them; missing scenes fall back to FLUX+Ken Burns.
 
 Output:
   output/{video_id}_cinematic.mp4
   output/{video_id}_cartoon.mp4
-  output/{video_id}_motion.mp4
 """
 
 import argparse
@@ -188,12 +202,16 @@ def run(
     add_music: bool = True,
     add_captions: bool = True,
     dry_run: bool = False,
+    video_id: str | None = None,
 ) -> dict[str, Path]:
     """
     Run the full FactsFactory pipeline.
 
     Args:
-        style: "cinematic" | "cartoon" | "motion" | "all"
+        style:     "cinematic" | "cartoon" | "all"
+        video_id:  Override the auto-generated video ID (base, without style suffix).
+                   Used to resume a run and pick up manual Veo clips from
+                   inbox/<video_id>_cinematic/veo/.
         ...all others match run_spine.py args...
 
     Returns:
@@ -229,10 +247,14 @@ def run(
     inbox_dir = Path("inbox")
     inbox_dir.mkdir(exist_ok=True)
 
-    # Base ID without style suffix (voice is shared)
-    base_video_id = _make_video_id(script_data["topic"], styles_to_run[0])
-    # Strip the style suffix from base_video_id for the voice file
-    base_video_id = base_video_id.rsplit("_", 1)[0]
+    # Base ID without style suffix (voice is shared across styles)
+    if video_id:
+        base_video_id = video_id
+        print(f"  Using provided video_id: {base_video_id}", flush=True)
+    else:
+        base_video_id = _make_video_id(script_data["topic"], styles_to_run[0])
+        # Strip the auto-generated style suffix — base_video_id is shared
+        base_video_id = base_video_id.rsplit("_", 1)[0]
 
     print(f"\n── Voiceover (base id: {base_video_id}) ──", flush=True)
     voice_path = inbox_dir / f"{base_video_id}_voice.mp3"
@@ -296,11 +318,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python main.py --style motion
+  python main.py --style cartoon
   python main.py --style cinematic --category weird_biology
   python main.py --style all --no-music
   python main.py --style cartoon --script-file logs/scripts/20260403_wasp.json
-  python main.py --style motion --dry-run
+  python main.py --style cartoon --dry-run
+
+Note: motion style is temporarily disabled.
         """,
     )
 
@@ -308,7 +332,7 @@ Examples:
         "--style",
         choices=STYLES + ["all"],
         required=True,
-        help="Visual style (or 'all' to generate all 3)",
+        help="Visual style (or 'all' to generate cinematic + cartoon)",
     )
     parser.add_argument(
         "--category",
@@ -319,6 +343,14 @@ Examples:
     parser.add_argument("--topic-file",    help="Resume from saved topic JSON")
     parser.add_argument("--research-file", help="Resume from saved research JSON")
     parser.add_argument("--script-file",   help="Resume from saved script JSON")
+    parser.add_argument(
+        "--video-id",
+        help=(
+            "Override the auto-generated video ID (base, without style suffix). "
+            "Use this to resume a run or add manual Veo clips: "
+            "place clips in inbox/<video_id>_cinematic/veo/scene_000.mp4, ..."
+        ),
+    )
     parser.add_argument(
         "--target-duration",
         type=int,
@@ -341,6 +373,7 @@ Examples:
         add_music=not args.no_music,
         add_captions=not args.no_captions,
         dry_run=args.dry_run,
+        video_id=args.video_id,
     )
 
 

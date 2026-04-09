@@ -52,11 +52,49 @@ OPENAI_MODEL = "dall-e-3"              # ~$0.040/image (standard quality)
 FAL_IMAGE_SIZE = "portrait_16_9"        # 576×1024 from fal.ai
 OPENAI_IMAGE_SIZE = "1024x1792"         # Closest 9:16-ish from OpenAI
 
-# Quality suffix appended to every prompt
-PROMPT_SUFFIX = (
-    ", portrait orientation 9:16, photorealistic wildlife photography, "
-    "cinematic lighting, high detail, no text, no watermarks"
-)
+
+
+# ── Prompt builder ───────────────────────────────────────────────────────────
+
+def _build_scene_prompt(scene: dict) -> str:
+    """
+    Build the final image generation prompt for a scene.
+
+    If the scene has structured infographic fields (main_subject, supporting_elements,
+    layout_hint), composes a dense infographic/comic-style educational prompt from them.
+
+    Falls back to scene["image_prompt"] for older storyboard files that lack those fields.
+    Short labels only — long text in generated images is unreliable.
+    """
+    main_subject = scene.get("main_subject")
+    supporting = scene.get("supporting_elements")
+    layout = scene.get("layout_hint")
+
+    if not (main_subject and supporting and layout):
+        # Backward compat: older storyboard JSON without structured fields
+        return scene["image_prompt"]
+
+    labels = scene.get("labels_and_callouts") or []
+    layout_display = layout.replace("_", " ")
+    supporting_str = "; ".join(str(e) for e in supporting[:4])
+
+    prompt = (
+        f"Infographic comic-style educational scene, {layout_display} layout, portrait 9:16. "
+        f"Main subject: {main_subject}. "
+        f"Supporting elements in the same frame: {supporting_str}. "
+    )
+    if labels:
+        # Keep labels short — long text renders poorly in AI image generation
+        short_labels = [str(l)[:20] for l in labels[:4]]
+        prompt += f"Short text labels/callouts: {', '.join(short_labels)}. "
+
+    prompt += (
+        "Style: flat illustration educational infographic, bold outlines, vibrant colors, "
+        "multiple visual elements in one composition, arrows pointing between elements, "
+        "callout boxes, labeled areas, diagrammatic overlays, high visual density, "
+        "clean readable composition. No watermarks, no photorealism, no empty negative space."
+    )
+    return prompt
 
 
 # ── Utility ──────────────────────────────────────────────────────────────────
@@ -113,13 +151,12 @@ def _generate_fal(prompt: str, scene_index: int) -> str:
 
     os.environ["FAL_KEY"] = fal_key
 
-    full_prompt = prompt + PROMPT_SUFFIX
     print(f"    [fal.ai] Generating scene {scene_index}...", flush=True)
 
     result = fal_client.run(
         FAL_MODEL,
         arguments={
-            "prompt": full_prompt,
+            "prompt": prompt,
             "image_size": FAL_IMAGE_SIZE,
             "num_inference_steps": 28,
             "guidance_scale": 3.5,
@@ -146,13 +183,12 @@ def _generate_openai(prompt: str, scene_index: int) -> str:
         raise RuntimeError("OPENAI_API_KEY not set")
 
     client = OpenAI(api_key=openai_key)
-    full_prompt = prompt + PROMPT_SUFFIX
 
     print(f"    [openai] Generating scene {scene_index}...", flush=True)
 
     response = client.images.generate(
         model=OPENAI_MODEL,
-        prompt=full_prompt,
+        prompt=prompt,
         size=OPENAI_IMAGE_SIZE,
         quality="standard",
         n=1,
@@ -206,7 +242,7 @@ def generate_scene_images(
 
     for scene in scenes:
         idx = scene["scene_index"]
-        prompt = scene["image_prompt"]
+        prompt = _build_scene_prompt(scene)
         dest = scenes_dir / f"scene_{idx:03d}.png"
 
         if dry_run:

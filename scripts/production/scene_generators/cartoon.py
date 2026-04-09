@@ -19,18 +19,20 @@ from scripts.production.scene_generators.base import SceneGenerator
 from scripts.production.scene_image_generator import generate_scene_images
 from scripts.production.scene_animator import animate_scenes
 
-# Appended to every image prompt to shift style toward illustration/cartoon
-CARTOON_PROMPT_SUFFIX = (
-    ", flat illustration style, bold outlines, vibrant colors, "
-    "clean 2D cartoon art, educational explainer style, "
-    "portrait orientation 9:16, no text, no watermarks, no photorealism"
+# Applied to legacy image_prompt (scenes without structured infographic fields)
+# to keep backward compatibility with older storyboard files.
+CARTOON_LEGACY_SUFFIX = (
+    ", flat illustration educational infographic style, bold outlines, vibrant colors, "
+    "clean 2D comic art, educational explainer scene, multiple visual elements, "
+    "portrait orientation 9:16, no watermarks, no photorealism"
 )
 
 
 class CartoonSceneGenerator(SceneGenerator):
     """
     Generates cartoon-style scenes:
-    1. AI image generation with flat/illustration prompts
+    1. AI image generation — infographic/comic prompts for structured storyboards,
+       legacy cartoon suffix for older storyboard files
     2. Ken Burns animation (zoom/pan on stills)
     """
 
@@ -51,10 +53,16 @@ class CartoonSceneGenerator(SceneGenerator):
         video_id: str,
         voice_duration: float | None = None,
     ) -> list[Path]:
-        """Generate cartoon clips: AI images → Ken Burns animation."""
+        """Generate cartoon clips: AI images → Ken Burns animation.
 
-        # Patch image prompts to cartoon style
-        patched_storyboard = _patch_prompts(storyboard, CARTOON_PROMPT_SUFFIX)
+        For scenes with structured infographic fields (main_subject, supporting_elements,
+        layout_hint), scene_image_generator builds a dense infographic/comic prompt via
+        _build_scene_prompt — no suffix patching needed.
+
+        For older scenes without those fields, falls back to legacy cartoon suffix on
+        image_prompt to maintain backward compatibility.
+        """
+        patched_storyboard = _apply_cartoon_style(storyboard)
 
         print(f"[cartoon] Generating {storyboard['total_scenes']} images via {self._provider}...", flush=True)
         generate_scene_images(
@@ -73,20 +81,32 @@ class CartoonSceneGenerator(SceneGenerator):
         return clips
 
 
-def _patch_prompts(storyboard: dict, suffix: str) -> dict:
+def _apply_cartoon_style(storyboard: dict) -> dict:
     """
-    Return a copy of the storyboard with cartoon suffix injected into each
-    image_prompt, replacing the cinematic/photorealistic suffix if present.
+    Return a patched copy of the storyboard ready for cartoon image generation.
+
+    Scenes WITH structured infographic fields (main_subject, supporting_elements,
+    layout_hint) are passed through unchanged — scene_image_generator._build_scene_prompt
+    will compose the infographic/comic prompt from those fields.
+
+    Scenes WITHOUT those fields (older storyboard files) get the cartoon suffix
+    injected into image_prompt for backward compatibility.
     """
     import copy
     patched = copy.deepcopy(storyboard)
     for scene in patched["scenes"]:
-        prompt = scene.get("image_prompt", "")
-        # Strip common photorealistic suffixes from the storyboard generator
-        for strip in [
-            ", portrait orientation 9:16, photorealistic wildlife photography, cinematic lighting, high detail, no text, no watermarks",
-            ", photorealistic", ", cinematic", "photorealistic",
-        ]:
-            prompt = prompt.replace(strip, "")
-        scene["image_prompt"] = prompt.rstrip(", ") + suffix
+        has_structured = (
+            scene.get("main_subject")
+            and scene.get("supporting_elements")
+            and scene.get("layout_hint")
+        )
+        if not has_structured:
+            # Legacy path: strip any photorealistic suffixes, inject cartoon style
+            prompt = scene.get("image_prompt", "")
+            for strip in [
+                ", portrait orientation 9:16, photorealistic wildlife photography, cinematic lighting, high detail, no text, no watermarks",
+                ", photorealistic", ", cinematic", "photorealistic",
+            ]:
+                prompt = prompt.replace(strip, "")
+            scene["image_prompt"] = prompt.rstrip(", ") + CARTOON_LEGACY_SUFFIX
     return patched

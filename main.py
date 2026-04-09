@@ -1,39 +1,47 @@
 #!/usr/bin/env python3
 """
-main.py — FactsFactory multi-style production pipeline
+main.py — FactsFactory production pipeline
 
-Runs the full short-form video pipeline from topic to finished mp4.
+Two-phase workflow (recommended for Veo ingest):
+
+  Phase 1 — Spine only (topic → script → storyboard, no media):
+    python main.py --spine-only --category science
+    → saves script + storyboard, prints video_id
+
+  Phase 2 — Render only (scene gen + voice + assembly):
+    python main.py --render-only --style all \\
+      --video-id <video_id> \\
+      --script-file logs/scripts/TIMESTAMP_topic.json \\
+      --storyboard-file logs/storyboards/TIMESTAMP_topic.json
+
+Full pipeline (spine + render in one step):
+    python main.py --style cartoon --category science
+    python main.py --style cinematic --category weird_biology
+    python main.py --style all --category animal_facts
 
 Styles:
-  cinematic  — AI-generated video (Veo/Runway) or FLUX stills + Ken Burns
-  cartoon    — Infographic/comic AI images + Ken Burns animation  (primary style)
-  all        — Generate cinematic + cartoon from the same script + voiceover
+  cinematic  — hybrid: manual Veo clips (inbox/<id>_cinematic/veo/) + FLUX fallback
+  cartoon    — infographic/comic AI images + Ken Burns animation  (primary style)
+  all        — generate cinematic + cartoon from the same script + voiceover
 
-Note: motion style is temporarily disabled. Use cinematic or cartoon.
+Note: motion style is temporarily disabled.
 
-Usage:
-  python main.py --style cinematic
-  python main.py --style cartoon
-  python main.py --style all
-  python main.py --style cinematic --category weird_biology
-  python main.py --style cartoon --script-file logs/scripts/20260403_wasp.json
-  python main.py --style all --no-music --no-captions
-  python main.py --style cartoon --dry-run
+Manual Veo ingest workflow:
+  1. python main.py --spine-only --category science
+     → note the video_id printed at the end
 
-Manual Veo ingest (hybrid cinematic):
-  1. Run once to get the storyboard and video ID:
-       python main.py --style cinematic --script-file logs/scripts/TIMESTAMP_topic.json
-     Note the video ID printed at startup (e.g. 20260409_mantis-shrimp).
+  2. Generate Veo clips externally, place them:
+       inbox/<video_id>_cinematic/veo/scene_000.mp4
+       inbox/<video_id>_cinematic/veo/scene_002.mp4
+     (optional manifest.json in that folder for explicit mapping)
 
-  2. Generate Veo clips externally, then place them:
-       inbox/20260409_mantis-shrimp_cinematic/veo/scene_000.mp4
-       inbox/20260409_mantis-shrimp_cinematic/veo/scene_002.mp4
+  3. python main.py --render-only --style all \\
+       --video-id <video_id> \\
+       --script-file logs/scripts/TIMESTAMP_topic.json \\
+       --storyboard-file logs/storyboards/TIMESTAMP_topic.json
 
-  3. Re-run with --video-id to reuse the same ID and pick up Veo clips:
-       python main.py --style cinematic --script-file logs/scripts/TIMESTAMP_topic.json \
-         --video-id 20260409_mantis-shrimp
-
-     Result: scenes with Veo clips use them; missing scenes fall back to FLUX+Ken Burns.
+     Result: cinematic uses Veo clips where present, FLUX for the rest.
+             cartoon runs full infographic/comic generation.
 
 Output:
   output/{video_id}_cinematic.mp4
@@ -69,18 +77,21 @@ CATEGORIES = [
 ]
 
 
-def _make_video_id(topic: str, style: str) -> str:
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _make_base_video_id(topic: str) -> str:
+    """Return a base video ID (no style suffix) from a topic string."""
     date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     slug = topic[:28].lower().replace(" ", "-")
     slug = "".join(c for c in slug if c.isalnum() or c == "-")
-    return f"{date_str}_{slug}_{style}"
+    return f"{date_str}_{slug}"
 
 
 def _write_hook_compat(video_id: str, script_data: dict) -> Path:
     """
     Write logs/hooks/{video_id}.json in PawFactory-compatible format.
-    voiceover.py reads this file when called via CLI; generate_voiceover()
-    takes the text directly so we only need this for reference.
+    voiceover.py reads this when called via CLI; generate_voiceover() takes
+    text directly so this is reference-only.
     """
     hook_dir = Path(os.getenv("LOG_DIR", "logs")) / "hooks"
     hook_dir.mkdir(parents=True, exist_ok=True)
@@ -103,6 +114,8 @@ def _get_voice_duration(voice_path: Path) -> float:
     )
     return float(r.stdout.strip())
 
+
+# ── Per-style scene generation + assembly ────────────────────────────────────
 
 def _produce_one_style(
     style: str,
@@ -149,7 +162,6 @@ def _produce_one_style(
 
     # ── Assembly: concat clips + voice + optional music ───────────────────────
     print(f"\n[{style}] Assembling video...", flush=True)
-    raw_path = output_dir / f"{video_id}_raw.mp4"
     try:
         assembled = assemble_video(
             video_id=video_id,
@@ -168,7 +180,7 @@ def _produce_one_style(
         ass_path = generate_ass_captions(
             audio_path=str(voice_path),
             output_dir=str(captions_dir),
-            video_id=base_video_id,   # share captions across styles (same script)
+            video_id=base_video_id,   # shared across styles — same script, same audio
             script_text=script_data["full_script"],
         )
         if ass_path:
@@ -182,7 +194,6 @@ def _produce_one_style(
                 shutil.copy2(assembled, final_path)
         else:
             shutil.copy2(assembled, final_path)
-        # Remove intermediate raw file
         assembled.unlink(missing_ok=True)
     else:
         shutil.move(str(assembled), final_path)
@@ -192,70 +203,26 @@ def _produce_one_style(
     return final_path
 
 
-def run(
-    style: str,
-    category: str = "animal_facts",
-    topic_file: str | None = None,
-    research_file: str | None = None,
-    script_file: str | None = None,
-    target_duration: int = 35,
-    add_music: bool = True,
-    add_captions: bool = True,
-    dry_run: bool = False,
-    video_id: str | None = None,
+# ── Render phase (shared by full pipeline and render-only) ───────────────────
+
+def _run_render(
+    storyboard: dict,
+    script_data: dict,
+    base_video_id: str,
+    styles_to_run: list[str],
+    add_music: bool,
+    add_captions: bool,
+    dry_run: bool,
 ) -> dict[str, Path]:
     """
-    Run the full FactsFactory pipeline.
-
-    Args:
-        style:     "cinematic" | "cartoon" | "all"
-        video_id:  Override the auto-generated video ID (base, without style suffix).
-                   Used to resume a run and pick up manual Veo clips from
-                   inbox/<video_id>_cinematic/veo/.
-        ...all others match run_spine.py args...
-
-    Returns:
-        Dict mapping style → output Path
+    Run scene generation + voiceover + assembly + captions for all requested styles.
+    Returns dict mapping style → output Path.
     """
-    sep = "═" * 60
-    print(f"\n{sep}", flush=True)
-    print(f"  FactsFactory — style: {style}", flush=True)
-    print(sep, flush=True)
-
-    styles_to_run = STYLES if style == "all" else [style]
-
-    # ── Text spine (shared across all styles) ─────────────────────────────────
-    print("\n── Text Spine ──", flush=True)
-    spine = run_spine(
-        category=category,
-        topic_file=topic_file,
-        research_file=research_file,
-        script_file=script_file,
-        target_duration=target_duration,
-        dry_run=dry_run,
-    )
-
-    if dry_run:
-        print("\n[dry-run] Text spine complete. Skipping media generation.", flush=True)
-        return {}
-
-    storyboard = spine["storyboard"]
-    script_data = spine["script"]
-
-    # ── Voiceover (shared — generated once) ──────────────────────────────────
     voice_id = os.getenv("ELEVENLABS_VOICE_ID", "pFZP5JQG7iQjIQuC4Bku")
     inbox_dir = Path("inbox")
     inbox_dir.mkdir(exist_ok=True)
 
-    # Base ID without style suffix (voice is shared across styles)
-    if video_id:
-        base_video_id = video_id
-        print(f"  Using provided video_id: {base_video_id}", flush=True)
-    else:
-        base_video_id = _make_video_id(script_data["topic"], styles_to_run[0])
-        # Strip the auto-generated style suffix — base_video_id is shared
-        base_video_id = base_video_id.rsplit("_", 1)[0]
-
+    # ── Voiceover (shared — generated once across all styles) ─────────────────
     print(f"\n── Voiceover (base id: {base_video_id}) ──", flush=True)
     voice_path = inbox_dir / f"{base_video_id}_voice.mp3"
 
@@ -276,7 +243,6 @@ def run(
     voice_duration = _get_voice_duration(voice_path)
     print(f"  Voice duration: {voice_duration:.2f}s", flush=True)
 
-    # Write hook-compat JSON for reference
     _write_hook_compat(base_video_id, script_data)
 
     # ── Scene generation + assembly per style ─────────────────────────────────
@@ -300,7 +266,191 @@ def run(
         if out:
             results[s] = out
 
-    # ── Summary ───────────────────────────────────────────────────────────────
+    return results
+
+
+# ── Public pipeline entry points ─────────────────────────────────────────────
+
+def run_spine_only(
+    category: str = "animal_facts",
+    topic_file: str | None = None,
+    research_file: str | None = None,
+    script_file: str | None = None,
+    target_duration: int = 35,
+) -> dict:
+    """
+    Phase 1 only: run the text spine (topic → research → script → storyboard).
+    Saves all artifacts to logs/. Prints the base video_id for use in Phase 2.
+    Returns the spine result dict.
+    """
+    sep = "═" * 60
+    print(f"\n{sep}", flush=True)
+    print("  FactsFactory — SPINE ONLY", flush=True)
+    print(sep, flush=True)
+
+    spine = run_spine(
+        category=category,
+        topic_file=topic_file,
+        research_file=research_file,
+        script_file=script_file,
+        target_duration=target_duration,
+        dry_run=False,
+    )
+
+    script_data = spine["script"]
+    base_video_id = _make_base_video_id(script_data["topic"])
+
+    print(f"\n{'═' * 60}", flush=True)
+    print("SPINE GENERATED", flush=True)
+    print(f"  Topic:          {script_data['topic']}", flush=True)
+    print(f"  Script:         {script_data['word_count']} words, "
+          f"~{script_data['estimated_duration_seconds']}s", flush=True)
+    print(f"  video_id:       {base_video_id}", flush=True)
+    print(f"  script_file:    {spine['script_file']}", flush=True)
+    print(f"  storyboard_file:{spine['storyboard_file']}", flush=True)
+    print(f"\nNext steps:", flush=True)
+    print(f"  1. (Optional) Generate Veo clips and place in:", flush=True)
+    print(f"       inbox/{base_video_id}_cinematic/veo/scene_000.mp4", flush=True)
+    print(f"  2. Run render phase:", flush=True)
+    print(f"       python main.py --render-only --style all \\", flush=True)
+    print(f"         --video-id {base_video_id} \\", flush=True)
+    print(f"         --script-file {spine['script_file']} \\", flush=True)
+    print(f"         --storyboard-file {spine['storyboard_file']}", flush=True)
+
+    spine["base_video_id"] = base_video_id
+    return spine
+
+
+def run_render_only(
+    style: str,
+    video_id: str,
+    script_file: str,
+    storyboard_file: str,
+    add_music: bool = True,
+    add_captions: bool = True,
+) -> dict[str, Path]:
+    """
+    Phase 2 only: skip spine, load existing script + storyboard, run full media pipeline.
+
+    Cinematic style will automatically check inbox/<video_id>_cinematic/veo/ for
+    manually provided Veo clips and use them in place of fallback generation.
+
+    Returns dict mapping style → output Path.
+    """
+    sep = "═" * 60
+    print(f"\n{sep}", flush=True)
+    print(f"  FactsFactory — RENDER ONLY (style: {style})", flush=True)
+    print(sep, flush=True)
+
+    # Load spine artifacts
+    sp = Path(script_file)
+    sb = Path(storyboard_file)
+
+    if not sp.exists():
+        print(f"ERROR: script file not found: {sp}", file=sys.stderr)
+        sys.exit(1)
+    if not sb.exists():
+        print(f"ERROR: storyboard file not found: {sb}", file=sys.stderr)
+        sys.exit(1)
+
+    script_data = json.loads(sp.read_text())
+    storyboard = json.loads(sb.read_text())
+
+    print(f"\n── Reusing existing spine ──", flush=True)
+    print(f"  Loaded script from:     {sp}", flush=True)
+    print(f"  Loaded storyboard from: {sb}", flush=True)
+    print(f"  video_id:               {video_id}", flush=True)
+    print(f"  topic:                  {script_data['topic']}", flush=True)
+
+    styles_to_run = STYLES if style == "all" else [style]
+
+    results = _run_render(
+        storyboard=storyboard,
+        script_data=script_data,
+        base_video_id=video_id,
+        styles_to_run=styles_to_run,
+        add_music=add_music,
+        add_captions=add_captions,
+        dry_run=False,
+    )
+
+    # Summary
+    print(f"\n{'═' * 60}", flush=True)
+    print("RENDER COMPLETE", flush=True)
+    print(f"  Topic:  {script_data['topic']}", flush=True)
+    for s, path in results.items():
+        size = path.stat().st_size / (1024 * 1024)
+        print(f"  {s:12s} → {path.name} ({size:.1f} MB)", flush=True)
+
+    return results
+
+
+def run(
+    style: str,
+    category: str = "animal_facts",
+    topic_file: str | None = None,
+    research_file: str | None = None,
+    script_file: str | None = None,
+    target_duration: int = 35,
+    add_music: bool = True,
+    add_captions: bool = True,
+    dry_run: bool = False,
+    video_id: str | None = None,
+) -> dict[str, Path]:
+    """
+    Full pipeline: spine + render in one step.
+
+    Args:
+        style:     "cinematic" | "cartoon" | "all"
+        video_id:  Override auto-generated base video ID. Use to resume a run
+                   and pick up Veo clips from inbox/<video_id>_cinematic/veo/.
+    Returns:
+        Dict mapping style → output Path.
+    """
+    sep = "═" * 60
+    print(f"\n{sep}", flush=True)
+    print(f"  FactsFactory — style: {style}", flush=True)
+    print(sep, flush=True)
+
+    styles_to_run = STYLES if style == "all" else [style]
+
+    # ── Text spine ────────────────────────────────────────────────────────────
+    print("\n── Text Spine ──", flush=True)
+    spine = run_spine(
+        category=category,
+        topic_file=topic_file,
+        research_file=research_file,
+        script_file=script_file,
+        target_duration=target_duration,
+        dry_run=dry_run,
+    )
+
+    if dry_run:
+        print("\n[dry-run] Text spine complete. Skipping media generation.", flush=True)
+        return {}
+
+    storyboard = spine["storyboard"]
+    script_data = spine["script"]
+
+    # Base ID (without style suffix) — shared voice + captions across styles
+    if video_id:
+        base_video_id = video_id
+        print(f"  Using provided video_id: {base_video_id}", flush=True)
+    else:
+        base_video_id = _make_base_video_id(script_data["topic"])
+
+    # ── Render ────────────────────────────────────────────────────────────────
+    results = _run_render(
+        storyboard=storyboard,
+        script_data=script_data,
+        base_video_id=base_video_id,
+        styles_to_run=styles_to_run,
+        add_music=add_music,
+        add_captions=add_captions,
+        dry_run=dry_run,
+    )
+
+    # Summary
     print(f"\n{'═' * 60}", flush=True)
     print("PIPELINE COMPLETE", flush=True)
     print(f"  Topic:  {script_data['topic']}", flush=True)
@@ -312,69 +462,155 @@ def run(
     return results
 
 
+# ── CLI ───────────────────────────────────────────────────────────────────────
+
 def main():
     parser = argparse.ArgumentParser(
-        description="FactsFactory — multi-style AI Shorts pipeline",
+        description="FactsFactory — AI Shorts pipeline (2-phase or full)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
-  python main.py --style cartoon
-  python main.py --style cinematic --category weird_biology
-  python main.py --style all --no-music
-  python main.py --style cartoon --script-file logs/scripts/20260403_wasp.json
-  python main.py --style cartoon --dry-run
+Modes:
+
+  Spine only (Phase 1 — generate script + storyboard, no media):
+    python main.py --spine-only --category science
+    python main.py --spine-only --category animal_facts --target-duration 40
+
+  Render only (Phase 2 — media from existing spine):
+    python main.py --render-only --style all \\
+      --video-id 20260409_mantis-shrimp \\
+      --script-file logs/scripts/20260409_123456_mantis-shrimp.json \\
+      --storyboard-file logs/storyboards/20260409_123456_mantis-shrimp.json
+
+  Full pipeline (spine + render):
+    python main.py --style cartoon --category weird_biology
+    python main.py --style cinematic --category animal_facts
+    python main.py --style all --no-music
+    python main.py --style cartoon --script-file logs/scripts/20260403_wasp.json --dry-run
 
 Note: motion style is temporarily disabled.
         """,
     )
 
+    # ── Mode flags ────────────────────────────────────────────────────────────
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--spine-only",
+        action="store_true",
+        help="Phase 1: run spine only (topic → script → storyboard). No media generated.",
+    )
+    mode.add_argument(
+        "--render-only",
+        action="store_true",
+        help=(
+            "Phase 2: skip spine, render from existing files. "
+            "Requires --style, --video-id, --script-file, --storyboard-file."
+        ),
+    )
+
+    # ── Style ─────────────────────────────────────────────────────────────────
     parser.add_argument(
         "--style",
         choices=STYLES + ["all"],
-        required=True,
-        help="Visual style (or 'all' to generate cinematic + cartoon)",
+        default=None,
+        help=(
+            "Visual style: cinematic | cartoon | all. "
+            "Required unless --spine-only. "
+            "'all' generates cinematic + cartoon from the same voiceover."
+        ),
     )
+
+    # ── Spine inputs ──────────────────────────────────────────────────────────
     parser.add_argument(
         "--category",
         choices=CATEGORIES,
         default="animal_facts",
         help="Content category for topic selection (default: animal_facts)",
     )
-    parser.add_argument("--topic-file",    help="Resume from saved topic JSON")
-    parser.add_argument("--research-file", help="Resume from saved research JSON")
-    parser.add_argument("--script-file",   help="Resume from saved script JSON")
-    parser.add_argument(
-        "--video-id",
-        help=(
-            "Override the auto-generated video ID (base, without style suffix). "
-            "Use this to resume a run or add manual Veo clips: "
-            "place clips in inbox/<video_id>_cinematic/veo/scene_000.mp4, ..."
-        ),
-    )
+    parser.add_argument("--topic-file",       help="Resume from saved topic JSON")
+    parser.add_argument("--research-file",    help="Resume from saved research JSON")
+    parser.add_argument("--script-file",      help="Resume from saved script JSON (or provide to render-only)")
+    parser.add_argument("--storyboard-file",  help="Path to storyboard JSON (required for --render-only)")
     parser.add_argument(
         "--target-duration",
         type=int,
         default=35,
         help="Target narration length in seconds (default: 35)",
     )
+
+    # ── Render controls ───────────────────────────────────────────────────────
+    parser.add_argument(
+        "--video-id",
+        help=(
+            "Base video ID (without style suffix). "
+            "Required for --render-only. "
+            "For full pipeline: overrides auto-generated ID to resume a run "
+            "or pick up manual Veo clips from inbox/<video_id>_cinematic/veo/."
+        ),
+    )
     parser.add_argument("--no-music",    action="store_true", help="Skip background music")
     parser.add_argument("--no-captions", action="store_true", help="Skip caption burning")
-    parser.add_argument("--dry-run",     action="store_true", help="Text spine only — no media")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Full pipeline only: run spine, print outputs, skip all media generation.",
+    )
 
     args = parser.parse_args()
 
-    run(
-        style=args.style,
-        category=args.category,
-        topic_file=args.topic_file,
-        research_file=args.research_file,
-        script_file=args.script_file,
-        target_duration=args.target_duration,
-        add_music=not args.no_music,
-        add_captions=not args.no_captions,
-        dry_run=args.dry_run,
-        video_id=args.video_id,
-    )
+    # ── Validate mode-specific requirements ───────────────────────────────────
+    if args.spine_only:
+        if args.style is not None:
+            parser.error("--style is not used with --spine-only")
+        if args.render_only:
+            parser.error("--spine-only and --render-only are mutually exclusive")
+
+        run_spine_only(
+            category=args.category,
+            topic_file=args.topic_file,
+            research_file=args.research_file,
+            script_file=args.script_file,
+            target_duration=args.target_duration,
+        )
+
+    elif args.render_only:
+        missing = []
+        if not args.style:
+            missing.append("--style")
+        if not args.video_id:
+            missing.append("--video-id")
+        if not args.script_file:
+            missing.append("--script-file")
+        if not args.storyboard_file:
+            missing.append("--storyboard-file")
+        if missing:
+            parser.error(f"--render-only requires: {', '.join(missing)}")
+
+        run_render_only(
+            style=args.style,
+            video_id=args.video_id,
+            script_file=args.script_file,
+            storyboard_file=args.storyboard_file,
+            add_music=not args.no_music,
+            add_captions=not args.no_captions,
+        )
+
+    else:
+        # Full pipeline mode
+        if not args.style:
+            parser.error("--style is required (choose from: cinematic, cartoon, all)")
+
+        run(
+            style=args.style,
+            category=args.category,
+            topic_file=args.topic_file,
+            research_file=args.research_file,
+            script_file=args.script_file,
+            target_duration=args.target_duration,
+            add_music=not args.no_music,
+            add_captions=not args.no_captions,
+            dry_run=args.dry_run,
+            video_id=args.video_id,
+        )
 
 
 if __name__ == "__main__":

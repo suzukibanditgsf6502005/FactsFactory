@@ -6,7 +6,7 @@
 
 ---
 
-## System State — 2026-04-09 (hybrid cinematic pipeline + cartoon infographic pivot)
+## System State — 2026-04-09 (2-phase pipeline + full docs update)
 
 ### Completed
 
@@ -15,41 +15,38 @@
 | Bootstrap | FactsFactory created from sanitized PawFactory snapshot |
 | GitHub repo | github.com/suzukibanditgsf6502005/FactsFactory |
 | Text spine | topic_selector → fact_research → script_generator → storyboard_generator — validated |
-| scene_image_generator.py | fal.ai Flux primary, OpenAI DALL-E fallback |
-| scene_animator.py | Ken Burns via ffmpeg zoompan (pan bug fixed — uses `on` variable) |
+| scene_image_generator.py v2 | fal.ai Flux primary, DALL-E fallback; _build_scene_prompt() |
+| scene_animator.py | Ken Burns via ffmpeg zoompan (pan bug fixed) |
 | assemble_video.py | concat + voiceover + music → final mp4 |
-| ass_captions.py | Whisper + Claude Haiku + ASS burn (temp-file fix applied) |
-| main.py | Full pipeline entry point with --style routing |
+| ass_captions.py | Whisper + Claude Haiku + ASS burn (temp-file fix) |
 | scene_generators/base.py | SceneGenerator abstract base class |
-| scene_generators/motion.py | Kinetic typography — ON DISK, TEMPORARILY DISABLED from public pipeline |
-| scene_generators/cartoon.py | fal.ai/DALL-E images + Ken Burns animation |
-| scene_generators/cinematic.py | Veo scaffold + Runway scaffold + FLUX fallback |
-| First short | output/wasp-test-001_captioned.mp4 (zombie wasp, 48.4s, with captions) |
+| scene_generators/cartoon.py v2 | infographic/comic path; legacy fallback for old storyboards |
+| scene_generators/cinematic.py v2 | hybrid: _load_veo_clips() + per-scene fallback |
+| scene_generators/__init__.py v2 | STYLES = [cinematic, cartoon]; motion raises RuntimeError |
+| scene_generators/motion.py | DISABLED — on disk, unreachable |
+| storyboard_generator.py v2 | infographic/comic prompts; structured fields (main_subject, supporting_elements, layout_hint, labels_and_callouts) |
+| **main.py v4** | **2-phase: --spine-only, --render-only; _run_render() extracted; --storyboard-file added; _make_base_video_id()** |
+| **CLAUDE.md** | **fully rewritten — current architecture, all 4 workflows, Veo ingest, style definitions** |
+| **README.md** | **fully rewritten — current architecture, 2-phase workflow, styles, layout, API keys** |
+| First short | output/wasp-test-001_captioned.mp4 (48.4s, with captions) |
 | Motion test | output/motion-test-001_final.mp4 (kinetic typography, verified) |
-| **storyboard_generator.py v2** | **NEW: infographic/comic prompts; emits main_subject, supporting_elements, layout_hint, labels_and_callouts** |
-| **scene_image_generator.py v2** | **NEW: _build_scene_prompt() — dense infographic prompt from structured fields; backward compat fallback** |
-| **cartoon.py v2** | **NEW: uses infographic path for structured scenes; legacy suffix fallback for old storyboards** |
-| **cinematic.py v2** | **NEW: hybrid pipeline — manual Veo clips + AI fallback per scene; _load_veo_clips()** |
-| **__init__.py updated** | **NEW: motion removed from STYLES; raises RuntimeError if requested** |
-| **main.py v3** | **NEW: --video-id flag; motion removed from CLI; --style all = cinematic + cartoon** |
 
 ### In Progress
 
-Nothing. Hybrid cinematic + infographic cartoon pivot both complete.
+Nothing. System ready for production batch.
 
 ### What Remains (ordered priority)
 
-1. **Run cartoon validation batch** — `python main.py --style cartoon --category weird_biology`
-2. **Evaluate infographic prompt quality** — compare dense multi-element frames vs. old single-subject
-3. **Test hybrid cinematic** — place Veo clips in `inbox/<video_id>_cinematic/veo/`, re-run with `--video-id`
-4. **YouTube OAuth2 setup** — `python scripts/publishing/youtube_uploader.py --auth`
-5. **Runway API wiring** — add RUNWAY_API_KEY to .env for automatic Runway cinematic generation
-6. **Veo API integration** — when Google opens Veo API publicly
-7. **Re-enable motion** — when ready to return to public pipeline
+1. **Cartoon validation batch** — `python main.py --style cartoon --category weird_biology`
+2. **2-phase workflow test** — spine-only → place Veo clips → render-only
+3. **YouTube OAuth2 setup** — `python scripts/publishing/youtube_uploader.py --auth`
+4. **Runway API wiring** — add RUNWAY_API_KEY for automatic Runway cinematic generation
+5. **Veo API integration** — when Google opens Veo API publicly
+6. **Re-enable motion** — when ready to return to public pipeline
 
 ### Blockers
 
-None. Cinematic falls back to FLUX. Cartoon uses infographic path. Veo ingest is manual + optional.
+None. All documented workflows are functional.
 
 ---
 
@@ -59,33 +56,21 @@ None. Cinematic falls back to FLUX. Cartoon uses infographic path. Veo ingest is
 cd /home/ai-machine/source/FactsFactory
 source venv/bin/activate
 
-# Run a cartoon short — new infographic/comic prompts
+# Validate cartoon infographic quality
 python main.py --style cartoon --category weird_biology
 
-# Run cinematic with FLUX fallback (note the video_id in output)
-python main.py --style cinematic --script-file logs/scripts/TIMESTAMP_topic.json
-# Note the base video_id printed at startup: e.g. 20260409_mantis-shrimp
+# Test 2-phase workflow
+python main.py --spine-only --category animal_facts
+# → note video_id, script_file, storyboard_file from output
 
-# Place manual Veo clips (external generation):
-#   inbox/20260409_mantis-shrimp_cinematic/veo/scene_000.mp4
-#   inbox/20260409_mantis-shrimp_cinematic/veo/scene_002.mp4
+# (place optional Veo clips)
+# mkdir -p inbox/<video_id>_cinematic/veo
+# cp /path/to/clip.mp4 inbox/<video_id>_cinematic/veo/scene_000.mp4
 
-# Re-run with --video-id to pick up Veo clips + fill rest with FLUX fallback
-python main.py --style cinematic --script-file logs/scripts/TIMESTAMP_topic.json \
-  --video-id 20260409_mantis-shrimp
-```
-
-## Manual Veo Ingest — Folder Convention
-
-```
-inbox/
-  <video_id>_cinematic/
-    veo/
-      scene_000.mp4     ← manually generated Veo clip for scene 0
-      scene_002.mp4     ← scene 2 (scene 1 will use fallback)
-      manifest.json     ← optional: [{"scene_index": 0, "filename": "scene_000.mp4"}, ...]
-    animated/           ← pipeline writes all clips here (Veo + fallback merged)
-    scenes/             ← FLUX still images (fallback scenes only)
+python main.py --render-only --style all \
+  --video-id <video_id> \
+  --script-file logs/scripts/TIMESTAMP_topic.json \
+  --storyboard-file logs/storyboards/TIMESTAMP_topic.json
 ```
 
 ---
@@ -93,36 +78,60 @@ inbox/
 ## Pipeline Architecture
 
 ```
-topic_selector → fact_research → script_generator → storyboard_generator (v2: infographic fields)
-                                                              ↓
-                              ┌───────────────────────────────┴──────────────────┐
-                              │                               │                   │
-                     CinematicSceneGenerator       CartoonSceneGenerator      [motion — DISABLED]
-                     (Veo → Runway → FLUX)         infographic/comic prompts
-                     photorealistic path           + Ken Burns animation
-                              │                               │
-                              └───────────────────────────────┘
-                                                              ↓
-                                                    voiceover (ElevenLabs)
-                                                              ↓
-                                                    assemble_video (ffmpeg)
-                                                              ↓
-                                                    ass_captions (Whisper + Claude)
-                                                              ↓
-                                             output/{video_id}_{style}.mp4
+Phase 1 — Text Spine
+  topic_selector → fact_research → script_generator → storyboard_generator
+       [Claude Haiku]  [Claude Sonnet]  [Claude Sonnet]    [Claude Haiku]
+                          (infographic/comic scene breakdown)
+
+Phase 2 — Media
+  storyboard ──┬──→ CartoonSceneGenerator
+               │      infographic/comic AI images + Ken Burns
+               │      fal.ai Flux → DALL-E fallback
+               │
+               └──→ CinematicSceneGenerator (hybrid)
+                      _load_veo_clips() → copy Veo clips to animated/
+                      fallback: Runway → Veo API → FLUX + Ken Burns
+                             ↓
+                    voiceover (ElevenLabs, shared across styles)
+                             ↓
+                    assemble_video (ffmpeg concat + voice + music)
+                             ↓
+                    ass_captions (Whisper + Claude Haiku + ASS burn)
+                             ↓
+                 output/{video_id}_cartoon.mp4
+                 output/{video_id}_cinematic.mp4
 ```
 
-## Entry Point
+## Entry Points
+
+```bash
+# Phase 1 only
+python main.py --spine-only [--category X] [--script-file ...] [--target-duration N]
+
+# Phase 2 only
+python main.py --render-only --style <style|all> \
+  --video-id <id> --script-file <path> --storyboard-file <path>
+
+# Full pipeline (spine + render)
+python main.py --style <style|all> [--category X] [--video-id <id>] [--dry-run]
+```
+
+## Veo Ingest Folder Convention
 
 ```
-python main.py --style cinematic|cartoon|all [options]
-# Note: motion is temporarily disabled
+inbox/<video_id>_cinematic/
+  veo/
+    scene_000.mp4     ← manual Veo clip for scene 0
+    scene_002.mp4     ← manual Veo clip for scene 2
+    manifest.json     ← optional: [{"scene_index": 0, "filename": "scene_000.mp4"}]
+  animated/           ← merged clips (Veo + fallback) — pipeline writes here
+  scenes/             ← FLUX still images (fallback scenes only)
 ```
 
 ## Repository Layout (key files)
 
 ```
-main.py                                    ← NEW: full pipeline entry point
+main.py                                    ← 2-phase pipeline entry point
 scripts/
   run_spine.py                             ← text spine orchestrator
   research/
@@ -130,20 +139,20 @@ scripts/
     fact_research.py                       ← v1: Claude Sonnet fact gatherer
   production/
     script_generator.py                    ← v2: Claude Sonnet script writer
-    storyboard_generator.py                ← v1: scene breakdown
-    scene_generators/                      ← NEW package
+    storyboard_generator.py                ← v2: infographic/comic scene breakdown
+    scene_generators/
       __init__.py                          ← factory: get_generator(style)
       base.py                              ← SceneGenerator ABC
-      cinematic.py                         ← Veo + Runway + FLUX fallback
-      cartoon.py                           ← FLUX/DALL-E + Ken Burns
-      motion.py                            ← pure ffmpeg kinetic typography
-    scene_image_generator.py               ← fal.ai / OpenAI image gen
+      cinematic.py                         ← v2: hybrid Veo + FLUX fallback
+      cartoon.py                           ← v2: infographic/comic + Ken Burns
+      motion.py                            ← DISABLED (on disk)
+    scene_image_generator.py               ← v2: _build_scene_prompt()
     scene_animator.py                      ← Ken Burns animator (ffmpeg)
     assemble_video.py                      ← concat + voice + music
     ass_captions.py                        ← Whisper + Claude + ASS burn
     voiceover.py                           ← ElevenLabs TTS (voice Lily)
     music_mixer.py                         ← 7-category track selection
-    quality_check.py                       ← Claude Vision QC (v2)
+    quality_check.py                       ← Claude Vision QC
   publishing/
     metadata_gen.py                        ← YouTube metadata gen
     publish_queue.py                       ← review queue
@@ -154,7 +163,7 @@ scripts/
 
 | Variable | Purpose |
 |---|---|
-| `ANTHROPIC_API_KEY` | Claude API — script gen, QC, captions |
+| `ANTHROPIC_API_KEY` | Claude API — script gen, storyboard, QC, captions |
 | `ELEVENLABS_API_KEY` | ElevenLabs TTS |
 | `ELEVENLABS_VOICE_ID` | Currently: `pFZP5JQG7iQjIQuC4Bku` (Lily) |
 | `FAL_API_KEY` | fal.ai Flux image generation |
@@ -167,8 +176,10 @@ scripts/
 | Decision | Rationale |
 |---|---|
 | Script-first, no scraping | FactsFactory core pivot |
-| 3 visual styles via SceneGenerator | Extensible without touching existing code |
-| Motion style as primary test path | No image API cost — fast iteration |
-| Cinematic falls back to FLUX | Keeps pipeline working without video API keys |
+| 2-phase pipeline (spine-only + render-only) | Enables manual Veo ingest between phases |
+| Hybrid cinematic | Veo clips used where present; FLUX fills gaps |
+| Cartoon = infographic/comic | Multi-element dense frames; more educational + scroll-stopping |
+| Motion disabled from public pipeline | Quality not production-ready yet |
 | Shared voiceover across styles | Same script → same voice → different visuals |
 | Captions shared across styles | Same ASS file reused (same audio) |
+| --storyboard-file arg added to main.py | Required for render-only mode |

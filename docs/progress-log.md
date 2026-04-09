@@ -5,6 +5,31 @@
 
 ---
 
+## 2026-04-09 — 2-phase pipeline + full docs rewrite
+
+**What was done:**
+- **main.py v4**: Extracted render logic into `_run_render()` (shared by full and render-only paths). Added `run_spine_only()` — runs spine, generates `base_video_id`, prints video_id + file paths + next-step command. Added `run_render_only()` — loads script + storyboard from files, logs "Reusing existing spine", calls `_run_render()`. Added `--spine-only` and `--render-only` mode flags (mutually exclusive). Added `--storyboard-file` arg (required for render-only). Made `--style` optional at parse time (validated in code per mode). Replaced `_make_video_id()` with `_make_base_video_id()` (no style suffix; cleaner). Updated module docstring with 2-phase workflow and all examples. Updated `run()` to use `_run_render()` internally.
+- **CLAUDE.md**: Full rewrite. Now documents: current pipeline steps (all implemented), visual styles (cartoon = infographic/comic, cinematic = hybrid Veo, motion = disabled), all 4 operator workflows (A/B/C/D), project structure with scene_generators/, Veo ingest folder convention, updated legacy module table, updated Git commit types.
+- **README.md**: Full rewrite. Now documents: what FactsFactory does, 2-phase workflow with exact commands, full pipeline workflow, quickstart, complete repo layout including inbox/veo/ convention, API keys table with required/optional column, rules, docs index.
+- **docs/current-task.md**: Updated to reflect 2-phase complete; module version table updated; next steps updated.
+- **docs/resume-handoff.md**: Full rewrite. Includes: completed items table, exact next action with 2-phase commands, pipeline architecture diagram, entry points, Veo ingest folder convention, repository layout, key config, decisions.
+- **docs/status-report.md**: Full rewrite. Includes: module status table with all versions, API key status, output produced, known limitations, operator workflow summary.
+
+**Files changed:**
+- `main.py` (v3 → v4)
+- `CLAUDE.md` (full rewrite)
+- `README.md` (full rewrite)
+- `docs/current-task.md` (full rewrite)
+- `docs/resume-handoff.md` (full rewrite)
+- `docs/status-report.md` (full rewrite)
+- `docs/progress-log.md`
+
+**Key design decision:** `--spine-only` and `--render-only` are mutually exclusive mode flags. `--style` is required for render-only and full pipeline but not for spine-only. `--storyboard-file` is a new arg required only for render-only.
+
+**Next step:** `python main.py --spine-only --category animal_facts` — validate 2-phase workflow end-to-end
+
+---
+
 ## 2026-04-09 — Hybrid cinematic pipeline: manual Veo ingest + per-scene fallback
 
 **What was done:**

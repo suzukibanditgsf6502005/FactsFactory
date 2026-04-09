@@ -1,8 +1,7 @@
 # FactsFactory
 
 AI-powered YouTube Shorts production system for script-first facts content.
-English-first. No scraping dependency as core content source.
-Operated primarily by Claude Code. Minimal human input required.
+English-first. Minimal human input. Operated primarily by Claude Code.
 
 Bootstrapped from PawFactory (animal rescue shorts pipeline).
 
@@ -10,38 +9,102 @@ Bootstrapped from PawFactory (animal rescue shorts pipeline).
 
 ## What It Does
 
-1. **Selects topics** — AI-driven topic selector picks high-interest fact categories
-2. **Researches facts** — AI fact researcher gathers verified, interesting content
-3. **Generates scripts** — Claude writes punchy, hook-driven narration scripts
-4. **Produces storyboards** — scene-by-scene visual breakdown aligned to script
-5. **Generates visuals** — AI-generated still images per scene (no footage required)
-6. **Animates scenes** — subtle motion / Ken Burns on stills for visual interest
-7. **Produces a finished Short** — voiceover (ElevenLabs) + captions + music + 9:16 output
-8. **QC gates** — Claude Vision scores the output; hard-fails are rejected
-9. **Queues for review** — human approves, pipeline uploads and schedules to YouTube
+FactsFactory turns a topic category into a finished, captioned YouTube Short — entirely through AI,
+with optional manual Veo clip injection for the cinematic style.
+
+1. **Selects topics** — Claude Haiku picks high-interest fact topics by category
+2. **Researches facts** — Claude Sonnet gathers 8–10 verified, compelling facts
+3. **Generates scripts** — Claude Sonnet writes a hook-first narration script
+4. **Produces storyboards** — scene-by-scene breakdown designed for dense infographic/comic frames
+5. **Generates visuals** — style-specific AI image generation or Veo clip ingest
+6. **Animates scenes** — Ken Burns motion on stills (cartoon + cinematic fallback)
+7. **Produces a finished Short** — ElevenLabs voiceover + word-by-word captions + music
+8. **QC gates** — Claude Vision scores the output
+9. **Queues for review** — human approves, pipeline uploads to YouTube
 
 ---
 
-## Architecture Direction
+## Visual Styles
 
-FactsFactory is a **script-first** pipeline. Unlike PawFactory (which sources footage from Reddit),
-FactsFactory generates all visual content from AI. The production flow is:
+### cartoon (primary style)
+- Dense infographic / educational comic frames
+- Every scene: multiple visual elements, arrows, callouts, labeled diagrams
+- AI image generation (fal.ai Flux primary, DALL-E fallback) + Ken Burns animation
+- Best for: complex biology, diagrams, process explanations, comparisons
+
+### cinematic (hybrid)
+- Manual Veo clips + AI fallback in one pass
+- Operator places `.mp4` clips in `inbox/<video_id>_cinematic/veo/`
+- Present clips used directly; missing scenes generate via FLUX + Ken Burns
+- Best for: dramatic nature footage, high-motion content, cinematic reveals
+
+### motion (temporarily disabled)
+- Kinetic typography via ffmpeg — no image generation required
+- On disk (`motion.py`) but not accessible from the public pipeline
+
+---
+
+## Two-Phase Workflow (recommended for Veo)
+
+### Phase 1 — Spine only
+
+Generate the script and storyboard. No API image costs.
+
+```bash
+python main.py --spine-only --category science
+```
+
+Output:
+- `logs/scripts/TIMESTAMP_topic.json`
+- `logs/storyboards/TIMESTAMP_topic.json`
+- Prints: video_id, file paths, next-step command
+
+### Manual Veo step (optional)
+
+Use the storyboard to guide external Veo generation.
+Place clips into the ingest folder:
 
 ```
-topic_selector  →  fact_research  →  script_generator  →  storyboard_generator
-      →  scene_image_generator  →  scene_animator  →  voiceover  →  video_editor
-      →  quality_check  →  publish_queue  →  YouTube
+inbox/<video_id>_cinematic/veo/
+  scene_000.mp4
+  scene_002.mp4
+  manifest.json   ← optional explicit mapping
 ```
 
-Inherited from PawFactory (reusable as-is or with minor adaptation):
-- `voiceover.py` — ElevenLabs TTS
-- `ass_captions.py` — 4-tier ASS captions
-- `music_mixer.py` — 7-category background music
-- `video_editor.py` — ffmpeg assembly pipeline
-- `quality_check.py` — Claude Vision QC
-- `metadata_gen.py` — YouTube metadata
-- `publish_queue.py` — review queue
-- `youtube_uploader.py` — YouTube Data API v3
+### Phase 2 — Render only
+
+```bash
+python main.py --render-only --style all \
+  --video-id <video_id> \
+  --script-file logs/scripts/TIMESTAMP_topic.json \
+  --storyboard-file logs/storyboards/TIMESTAMP_topic.json
+```
+
+Result:
+- `output/<video_id>_cartoon.mp4` — infographic/comic style, full pipeline
+- `output/<video_id>_cinematic.mp4` — Veo clips where present + FLUX fallback
+
+---
+
+## Full Pipeline (one step)
+
+```bash
+# Cartoon (recommended — no Veo clips needed)
+python main.py --style cartoon --category weird_biology
+
+# Cinematic with FLUX fallback
+python main.py --style cinematic --category animal_facts
+
+# Both styles from one script + voiceover
+python main.py --style all --category science
+
+# Resume from existing script
+python main.py --style cartoon --script-file logs/scripts/20260403_wasp.json
+
+# Re-run cinematic with Veo clips placed since last run
+python main.py --style cinematic --script-file logs/scripts/... \
+  --video-id 20260409_mantis-shrimp
+```
 
 ---
 
@@ -57,68 +120,88 @@ cp .env.example .env        # fill in API keys
 sudo apt install ffmpeg
 ```
 
+Run your first spine:
+
+```bash
+python main.py --spine-only --category animal_facts
+```
+
 ---
 
 ## Repository Layout
 
 ```
+main.py                              ← pipeline entry point (2-phase or full)
 scripts/
+  run_spine.py                       ← text spine orchestrator (steps 1–4)
   research/
-    topic_selector.py        — AI topic selection (SCAFFOLD)
-    fact_research.py         — AI fact gathering (SCAFFOLD)
+    topic_selector.py                ← Claude Haiku topic selection
+    fact_research.py                 ← Claude Sonnet fact research
   production/
-    script_generator.py      — Claude: hook + full narration script (SCAFFOLD)
-    storyboard_generator.py  — scene breakdown from script (SCAFFOLD)
-    scene_image_generator.py — AI still image per scene (SCAFFOLD)
-    scene_animator.py        — Ken Burns / motion on stills (SCAFFOLD)
-    voiceover.py             — ElevenLabs TTS (voice: Lily) [inherited]
-    music_mixer.py           — Claude Haiku track selection [inherited]
-    video_editor.py          — ffmpeg: 9:16 → mux → captions → trim [inherited]
-    ass_captions.py          — Whisper + Claude Haiku + 4-tier ASS [inherited]
-    quality_check.py         — Claude Vision QC, 6 dimensions [inherited]
-    hook_generator.py        — LEGACY: PawFactory hook gen (kept for reference)
-    smart_clipper.py         — LEGACY: PawFactory clip selector (kept for reference)
-    visual_sampler.py        — LEGACY: PawFactory visual grounding (kept for reference)
+    script_generator.py              ← Claude Sonnet narration script
+    storyboard_generator.py          ← infographic/comic scene breakdown
+    scene_generators/
+      __init__.py                    ← factory: get_generator(style)
+      base.py                        ← SceneGenerator abstract base
+      cinematic.py                   ← hybrid: Veo ingest + FLUX fallback
+      cartoon.py                     ← infographic/comic AI images + Ken Burns
+      motion.py                      ← DISABLED (kinetic typography)
+    scene_image_generator.py         ← fal.ai Flux / DALL-E image gen
+    scene_animator.py                ← Ken Burns animation (ffmpeg)
+    voiceover.py                     ← ElevenLabs TTS (voice: Lily)
+    assemble_video.py                ← ffmpeg: concat + voice + music
+    ass_captions.py                  ← Whisper + Claude Haiku + ASS burn
+    music_mixer.py                   ← 7-category background music selection
+    quality_check.py                 ← Claude Vision QC (6 dimensions)
+    hook_generator.py                ← LEGACY: PawFactory (reference only)
+    smart_clipper.py                 ← LEGACY: PawFactory (reference only)
+    visual_sampler.py                ← LEGACY: PawFactory (reference only)
   publishing/
-    metadata_gen.py          — title, description, tags [inherited]
-    publish_queue.py         — review queue [inherited]
-    youtube_uploader.py      — YouTube Data API v3 [inherited]
-    tiktok_publisher.py      — TikTok Content Posting API v2 [inherited]
+    metadata_gen.py                  ← YouTube title, description, tags
+    publish_queue.py                 ← human review queue
+    youtube_uploader.py              ← YouTube Data API v3 (needs OAuth2)
   sourcing/
-    reddit_scraper.py        — LEGACY: PawFactory scraper (kept, not core path)
-    downloader.py            — LEGACY: PawFactory downloader (kept, not core path)
-  run_pipeline.py            — LEGACY: PawFactory orchestrator (to be replaced)
+    reddit_scraper.py                ← LEGACY: PawFactory (not core path)
+    downloader.py                    ← LEGACY: PawFactory (not core path)
+  run_pipeline.py                    ← LEGACY: PawFactory orchestrator
 
-logs/                        — gitignored
-inbox/                       — gitignored
-output/                      — gitignored
-assets/music/                — background music library (7 categories)
-assets/fonts/                — Anton-Regular.ttf
-docs/                        — documentation
-shorts/log.md                — permanent record of all produced content
+inbox/                               ← working files per video_id (gitignored)
+  <video_id>_cinematic/
+    veo/                             ← place manual Veo clips here
+    animated/                        ← merged clips (Veo + fallback)
+    scenes/                          ← FLUX still images (fallback only)
+output/                              ← finished mp4 shorts (gitignored)
+logs/                                ← topics, research, scripts, storyboards (gitignored)
+assets/music/                        ← background music (7 categories)
+assets/fonts/                        ← Anton-Regular.ttf
+docs/                                ← documentation
+shorts/log.md                        ← permanent record of all produced content
 ```
-
----
-
-## Key Rules
-
-- Script-first: no scraping as production path (sourcing scripts are legacy)
-- English-first: all content in English
-- Never publish without human approval (`--approve` required)
-- Never spend > $5 API credits in a single session
-- Never commit `.env`, `inbox/`, `output/`, `logs/`, music MP3s
 
 ---
 
 ## Required API Keys (.env)
 
-| Variable | Service |
-|---|---|
-| `ANTHROPIC_API_KEY` | Claude — scripts, QC, captions |
-| `ELEVENLABS_API_KEY` | Voiceover (voice Lily) |
-| `ELEVENLABS_VOICE_ID` | Currently `pFZP5JQG7iQjIQuC4Bku` |
-| `SUBMAGIC_API_KEY` | Caption API (optional — ASS fallback if missing) |
-| `YOUTUBE_CLIENT_SECRETS` | Path to OAuth2 JSON from Google Cloud Console |
+| Variable | Service | Required |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Claude — scripts, storyboard, QC, captions | ✅ |
+| `ELEVENLABS_API_KEY` | Voiceover (voice Lily) | ✅ |
+| `ELEVENLABS_VOICE_ID` | Currently `pFZP5JQG7iQjIQuC4Bku` | ✅ |
+| `FAL_API_KEY` | fal.ai Flux image generation | ✅ |
+| `OPENAI_API_KEY` | DALL-E fallback | optional |
+| `RUNWAY_API_KEY` | Runway Gen-3 cinematic generation | optional |
+| `GOOGLE_API_KEY` | Veo API (scaffold — not yet public) | optional |
+| `YOUTUBE_CLIENT_SECRETS` | OAuth2 JSON for YouTube upload | optional |
+
+---
+
+## Key Rules
+
+- Script-first: no scraping as production path
+- English-first: all content in English
+- Never publish without human approval
+- Never spend > $5 API credits in a single session
+- Never commit `.env`, `inbox/`, `output/`, `logs/`, music MP3s
 
 ---
 
@@ -126,12 +209,8 @@ shorts/log.md                — permanent record of all produced content
 
 | Doc | Contents |
 |---|---|
+| `CLAUDE.md` | Operator guide — workflows, rules, architecture |
 | `docs/resume-handoff.md` | Current system state, completed work, next action |
 | `docs/current-task.md` | Active objective and immediate next steps |
 | `docs/progress-log.md` | Append-only history of changes |
-| `docs/status-report.md` | System health and decisions |
-| `docs/caption-system.md` | ASS caption pipeline (inherited from PawFactory) |
-| `docs/qa-system.md` | QC scoring, thresholds, provider config |
-| `docs/publishing-system.md` | Full publishing guide, OAuth2 setup |
-| `docs/workflow.md` | Step-by-step production guide |
-| `docs/tools.md` | API setup and costs |
+| `docs/status-report.md` | System health and module status |
